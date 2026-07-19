@@ -1,0 +1,15 @@
+[project]
+name = "lightningparse-api"
+version = "0.1.0"
+description = "FastAPI service for LightningParse"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "httpx"
+]
