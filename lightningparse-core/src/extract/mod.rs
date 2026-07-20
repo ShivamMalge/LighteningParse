@@ -9,6 +9,7 @@ use std::time::Instant;
 
 use lopdf::content::{Content, Operation};
 use lopdf::{Document, Object, ObjectId};
+use rayon::prelude::*;
 
 use crate::errors::ParseError;
 use crate::output::{Block, DocumentMetadata, Page, ParseResult};
@@ -18,6 +19,8 @@ use crate::output::{Block, DocumentMetadata, Page, ParseResult};
 /// Extract structured text from a digital-native PDF loaded into memory.
 ///
 /// Returns a [`ParseResult`] matching the JSON schema in ARCHITECTURE.md §3.1.
+/// Pages are processed in parallel via `rayon` and then sorted by page number
+/// to guarantee deterministic document-order output.
 /// All pages are treated as Tier 1 (digital-native). Header/footer tagging
 /// and OCR fallback are not wired up yet (Phase 4 / Phase 5).
 pub fn extract_text(pdf_bytes: &[u8]) -> Result<ParseResult, ParseError> {
@@ -33,11 +36,17 @@ pub fn extract_text(pdf_bytes: &[u8]) -> Result<ParseResult, ParseError> {
     let pages_map = doc.get_pages(); // BTreeMap<u32, ObjectId>
     let page_count = pages_map.len() as u32;
 
-    let mut pages = Vec::with_capacity(page_count as usize);
-    for (&page_num, &page_id) in &pages_map {
-        let page = extract_page(&doc, page_num, page_id)?;
-        pages.push(page);
-    }
+    // Collect entries so rayon can partition them across threads.
+    let entries: Vec<(u32, ObjectId)> = pages_map.iter().map(|(&n, &id)| (n, id)).collect();
+
+    // Extract pages in parallel; collect results and propagate first error.
+    let mut pages: Vec<Page> = entries
+        .par_iter()
+        .map(|&(page_num, page_id)| extract_page(&doc, page_num, page_id))
+        .collect::<Result<Vec<Page>, ParseError>>()?;
+
+    // Sort by page_num — parallel execution may reorder results.
+    pages.sort_by_key(|p| p.page_num);
 
     let parse_time_ms = start.elapsed().as_millis() as u64;
 
