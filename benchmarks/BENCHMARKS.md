@@ -4,26 +4,14 @@
 
 **Runs per file:** 5 (+ 1 warm-up)
 
-## Shivam_FullStack.pdf
-
-| Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
-|---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 1 | 1.91 | 2.01 | 1.77 | 2.50 | 0.29 |
-| pypdf | 1 | 113.68 | 112.34 | 105.02 | 119.71 | 6.89 |
-| pdfplumber | 1 | 301.09 | 308.93 | 295.44 | 330.84 | 15.25 |
-
-**Speedup:**
-- vs pypdf: **59.5×** faster
-- vs pdfplumber: **157.6×** faster
-
 ## draft10.pdf
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 8 | 8.30 | 8.46 | 8.14 | 9.24 | 0.44 |
-| pypdf | 8 | 283.69 | 289.93 | 281.31 | 304.95 | 10.37 |
-| pdfplumber | 8 | 1216.75 | 1222.23 | 1190.15 | 1246.54 | 23.30 |
+| lightningparse | 8 | 9.47 | 9.60 | 9.24 | 10.06 | 0.32 |
+| pypdf | 8 | 279.44 | 283.49 | 266.26 | 310.93 | 17.35 |
+| pdfplumber | 8 | 1626.96 | 1611.01 | 1475.48 | 1665.98 | 77.98 |
 
 **Speedup:**
-- vs pypdf: **34.2×** faster
-- vs pdfplumber: **146.6×** faster
+- vs pypdf: **29.5×** faster
+- vs pdfplumber: **171.8×** faster

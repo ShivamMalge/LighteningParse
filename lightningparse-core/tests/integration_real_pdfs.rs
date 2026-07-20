@@ -24,11 +24,20 @@ fn read_corpus_file(name: &str) -> Vec<u8> {
     })
 }
 
-// ── Shivam_FullStack.pdf (image-based / scanned, 0 digital blocks) ──
+// ── Shivam_FullStack.pdf (image-based / scanned, Tier 2 — not in Tier 1 corpus) ──
 
 #[test]
 fn test_real_scanned_pdf_parses_without_error() {
-    let bytes = read_corpus_file("Shivam_FullStack.pdf");
+    // Lives in tests/fixtures/tier2/, NOT benchmarks/corpus/ (Tier 1).
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("tests");
+    path.push("fixtures");
+    path.push("tier2");
+    path.push("Shivam_FullStack.pdf");
+    let bytes = std::fs::read(&path).unwrap_or_else(|e| {
+        panic!("Could not read fixture {}: {e}", path.display());
+    });
+
     let result = lightningparse::extract::extract_text(&bytes)
         .expect("Shivam_FullStack.pdf should parse without error");
 
@@ -37,7 +46,7 @@ fn test_real_scanned_pdf_parses_without_error() {
     assert_eq!(result.metadata.tier, "digital");
 
     // This PDF is image-based — Tier 1 extraction correctly produces 0 blocks.
-    // It will need OCR (Tier 2) in a later phase.
+    // It will need OCR (Tier 2) in Phase 5.
     let total_blocks: usize = result.pages.iter().map(|p| p.blocks.len()).sum();
     assert_eq!(
         total_blocks, 0,
