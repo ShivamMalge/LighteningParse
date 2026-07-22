@@ -9,6 +9,7 @@ use pyo3::prelude::*;
 
 use crate::errors::ParseError;
 use crate::extract;
+use crate::cleanup;
 
 // Python exception types mapped from ParseError variants.
 create_exception!(lightningparse, CorruptPdfError, pyo3::exceptions::PyException);
@@ -35,7 +36,9 @@ impl From<ParseError> for PyErr {
 fn parse_pdf(py: Python<'_>, path: String) -> PyResult<String> {
     let result_json = py.allow_threads(move || -> Result<String, ParseError> {
         let pdf_bytes = std::fs::read(&path).map_err(ParseError::Io)?;
-        let result = extract::extract_text(&pdf_bytes)?;
+        let mut result = extract::extract_text(&pdf_bytes)?;
+        result.pages = cleanup::reconstruct_reading_order(result.pages)?;
+        result.pages = cleanup::detect_headers_footers(result.pages)?;
         serde_json::to_string(&result)
             .map_err(|e| ParseError::Internal(format!("JSON serialization failed: {e}")))
     })?;
