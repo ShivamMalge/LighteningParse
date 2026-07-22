@@ -508,36 +508,73 @@ fn process_operations(ops: &[Operation], font_map: &FontMap) -> Vec<RawBlock> {
 
             // ── text positioning ──
             "Tm" if op.operands.len() >= 6 => {
-                ts.tm = mat_from_operands(&op.operands);
+                let new_tm = mat_from_operands(&op.operands);
+                if let Some(blk) = current.as_mut() {
+                    if !blk.text.is_empty() {
+                        let dy = new_tm[5] - ts.tm[5];
+                        let effective_fs = ts.font_size.abs() * if ts.tm[3].abs() > 0.001 { ts.tm[3].abs() } else { 1.0 };
+                        let fs_threshold = if effective_fs > 0.1 { effective_fs } else { 12.0 };
+                        
+                        if dy > fs_threshold || dy < -fs_threshold * 2.5 {
+                            blocks.push(current.take().unwrap());
+                            current = Some(RawBlock::new());
+                        }
+                    }
+                }
+                ts.tm = new_tm;
                 ts.lm = ts.tm;
             }
             "Td" if op.operands.len() >= 2 => {
                 let tx = num(&op.operands[0]);
                 let ty = num(&op.operands[1]);
+                if let Some(blk) = current.as_mut() {
+                    if !blk.text.is_empty() {
+                        if ty > 0.0 || ty < -ts.font_size * 2.5 {
+                            blocks.push(current.take().unwrap());
+                            current = Some(RawBlock::new());
+                        } else {
+                            if ty.abs() > ts.font_size * 0.3 {
+                                blk.text.push('\n');
+                            } else if tx > ts.font_size * 0.25 {
+                                blk.text.push(' ');
+                            }
+                        }
+                    }
+                }
                 ts.lm = mat_translate(&ts.lm, tx, ty);
                 ts.tm = ts.lm;
-                insert_spacing(&mut current, tx, ty, ts.font_size);
             }
             "TD" if op.operands.len() >= 2 => {
                 let tx = num(&op.operands[0]);
                 let ty = num(&op.operands[1]);
                 ts.leading = -ty;
+                if let Some(blk) = current.as_mut() {
+                    if !blk.text.is_empty() {
+                        if ty > 0.0 || ty < -ts.font_size * 2.5 {
+                            blocks.push(current.take().unwrap());
+                            current = Some(RawBlock::new());
+                        } else {
+                            blk.text.push('\n');
+                        }
+                    }
+                }
                 ts.lm = mat_translate(&ts.lm, tx, ty);
                 ts.tm = ts.lm;
-                if let Some(ref mut blk) = current {
-                    if !blk.text.is_empty() {
-                        blk.text.push('\n');
-                    }
-                }
             }
             "T*" => {
-                ts.lm = mat_translate(&ts.lm, 0.0, -ts.leading);
-                ts.tm = ts.lm;
-                if let Some(ref mut blk) = current {
+                let ty = -ts.leading;
+                if let Some(blk) = current.as_mut() {
                     if !blk.text.is_empty() {
-                        blk.text.push('\n');
+                        if ty > 0.0 || ty < -ts.font_size * 2.5 {
+                            blocks.push(current.take().unwrap());
+                            current = Some(RawBlock::new());
+                        } else {
+                            blk.text.push('\n');
+                        }
                     }
                 }
+                ts.lm = mat_translate(&ts.lm, 0.0, -ts.leading);
+                ts.tm = ts.lm;
             }
 
             // ── text showing ──
@@ -606,13 +643,26 @@ fn show_string(
     let decoder = font_map.get(&ts.font_name).unwrap_or(&FontDecoder::Fallback);
     let decoded = decode_text(bytes, decoder);
     let width = estimate_width(&decoded, ts.font_size, ts.h_scaling);
+    let advance = width / (ts.h_scaling / 100.0);
 
-    let (x, y) = transform_pt(ts.tm[4], ts.tm[5], ctm);
-    blk.update_bounds(x, y, width, ts.font_size.abs());
+    let comp = mat_mul(&ts.tm, ctm);
+    let h = ts.font_size.abs();
+    let c1 = transform_pt(0.0, 0.0, &comp);
+    let c2 = transform_pt(advance, 0.0, &comp);
+    let c3 = transform_pt(advance, h, &comp);
+    let c4 = transform_pt(0.0, h, &comp);
+
+    let min_x = c1.0.min(c2.0).min(c3.0).min(c4.0);
+    let max_x = c1.0.max(c2.0).max(c3.0).max(c4.0);
+    let min_y = c1.1.min(c2.1).min(c3.1).min(c4.1);
+    let max_y = c1.1.max(c2.1).max(c3.1).max(c4.1);
+
+    blk.update_bounds(min_x, min_y, max_x - min_x, max_y - min_y);
     blk.text.push_str(&decoded);
 
-    // Advance the text position by estimated width.
-    ts.tm[4] += width / (ts.h_scaling / 100.0);
+    // Advance the text position along the unscaled text vector
+    ts.tm[4] += advance * ts.tm[0];
+    ts.tm[5] += advance * ts.tm[1];
 }
 
 /// Process a TJ array: interleaved strings and kerning numbers.
@@ -629,35 +679,36 @@ fn show_tj_array(
         if let Some(bytes) = string_bytes(item) {
             let decoded = decode_text(bytes, decoder);
             let width = estimate_width(&decoded, ts.font_size, ts.h_scaling);
+            let advance = width / (ts.h_scaling / 100.0);
 
-            let (x, y) = transform_pt(ts.tm[4], ts.tm[5], ctm);
-            blk.update_bounds(x, y, width, ts.font_size.abs());
+            let comp = mat_mul(&ts.tm, ctm);
+            let h = ts.font_size.abs();
+            let c1 = transform_pt(0.0, 0.0, &comp);
+            let c2 = transform_pt(advance, 0.0, &comp);
+            let c3 = transform_pt(advance, h, &comp);
+            let c4 = transform_pt(0.0, h, &comp);
+
+            let min_x = c1.0.min(c2.0).min(c3.0).min(c4.0);
+            let max_x = c1.0.max(c2.0).max(c3.0).max(c4.0);
+            let min_y = c1.1.min(c2.1).min(c3.1).min(c4.1);
+            let max_y = c1.1.max(c2.1).max(c3.1).max(c4.1);
+
+            blk.update_bounds(min_x, min_y, max_x - min_x, max_y - min_y);
             blk.text.push_str(&decoded);
 
-            ts.tm[4] += width / (ts.h_scaling / 100.0);
+            ts.tm[4] += advance * ts.tm[0];
+            ts.tm[5] += advance * ts.tm[1];
         } else {
             // Kerning adjustment in thousandths of a text-space unit.
             let adj = num(item);
             let displacement = adj * ts.font_size / 1000.0;
-            ts.tm[4] -= displacement / (ts.h_scaling / 100.0);
+            let advance = -displacement / (ts.h_scaling / 100.0);
+            ts.tm[4] += advance * ts.tm[0];
+            ts.tm[5] += advance * ts.tm[1];
             // Large negative adj (= positive spacing) often means a word gap.
             if adj < -120.0 {
                 blk.text.push(' ');
             }
-        }
-    }
-}
-
-/// Insert whitespace into the block when position jumps (Td/TD).
-fn insert_spacing(current: &mut Option<RawBlock>, tx: f64, ty: f64, font_size: f64) {
-    if let Some(ref mut blk) = current {
-        if blk.text.is_empty() {
-            return;
-        }
-        if ty.abs() > font_size * 0.3 {
-            blk.text.push('\n');
-        } else if tx > font_size * 0.25 {
-            blk.text.push(' ');
         }
     }
 }

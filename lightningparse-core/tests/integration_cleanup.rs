@@ -60,6 +60,9 @@ fn test_reading_order_arxiv_twocolumn() {
     result.pages = lightningparse::cleanup::detect_headers_footers(result.pages).unwrap();
 
     assert!(result.metadata.page_count > 1, "Arxiv paper should be multiple pages");
+    
+    let p1_blocks = result.pages[0].blocks.len();
+    assert!(p1_blocks > 20, "Arxiv page 1 should have >20 blocks, got {}; ensuring BT...ET over-merging is fixed", p1_blocks);
 
     let mut _header_count = 0;
     let mut body_count = 0;
