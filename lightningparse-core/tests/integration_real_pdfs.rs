@@ -27,7 +27,7 @@ fn read_corpus_file(name: &str) -> Vec<u8> {
 // ── Shivam_FullStack.pdf (image-based / scanned, Tier 2 — not in Tier 1 corpus) ──
 
 #[test]
-fn test_real_scanned_pdf_parses_without_error() {
+fn test_real_canva_pdf_form_xobject_extraction() {
     // Lives in tests/fixtures/tier2/, NOT benchmarks/corpus/ (Tier 1).
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("tests");
@@ -45,12 +45,12 @@ fn test_real_scanned_pdf_parses_without_error() {
     assert_eq!(result.pages.len(), 1);
     assert_eq!(result.metadata.tier, "digital");
 
-    // This PDF is image-based — Tier 1 extraction correctly produces 0 blocks.
-    // It will need OCR (Tier 2) in Phase 5.
+    // This PDF is a Canva digital-native PDF that wraps the entire page in a Form XObject.
+    // It should now correctly extract text since Form XObject `Do` tracking is implemented.
     let total_blocks: usize = result.pages.iter().map(|p| p.blocks.len()).sum();
     assert_eq!(
-        total_blocks, 0,
-        "scanned PDF should produce 0 blocks from digital extraction"
+        total_blocks, 67,
+        "Canva PDF should produce 67 blocks from digital extraction inside Form XObjects"
     );
 }
 

@@ -76,9 +76,18 @@ fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<Page
     let content = Content::decode(&content_bytes)
         .map_err(|e| ParseError::CorruptPdf(format!("Page {page_num} content stream: {e}")))?;
 
-    let font_map = build_font_map(doc, page_id);
+    let page_obj = doc.get_object(page_id).map_err(|e| ParseError::CorruptPdf(e.to_string()))?;
+    let page_dict = page_obj.as_dict().map_err(|_| ParseError::CorruptPdf("Page is not a dictionary".into()))?;
+    let resources = get_resources(doc, page_dict);
 
-    let raw_blocks = process_operations(&content.operations, &font_map);
+    let font_map = build_font_map_from_resources(doc, resources);
+    let xobjs_dict = resources
+        .and_then(|r| r.get(b"XObject").ok())
+        .and_then(|x| resolve(doc, x).ok())
+        .and_then(|x| x.as_dict().ok());
+
+    let mut raw_blocks = Vec::new();
+    process_operations(doc, &content.operations, &font_map, xobjs_dict, IDENTITY, 0, &mut raw_blocks);
 
     let blocks: Vec<Block> = raw_blocks
         .into_iter()
@@ -100,6 +109,7 @@ fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<Page
 // ── Font encoding ───────────────────────────────────────────────
 
 /// How to decode character-code bytes → Unicode for one font.
+#[derive(Clone)]
 enum FontDecoder {
     /// Windows-1252 / WinAnsiEncoding (most common for Western PDFs).
     WinAnsi,
@@ -109,52 +119,79 @@ enum FontDecoder {
     Fallback,
 }
 
-type FontMap = HashMap<Vec<u8>, FontDecoder>;
+#[derive(Clone)]
+struct FontInfo {
+    decoder: FontDecoder,
+    first_char: u16,
+    widths: Option<Vec<f64>>,
+}
 
-/// Build a font-name → decoder map from the page's Resources/Font dict.
-fn build_font_map(doc: &Document, page_id: ObjectId) -> FontMap {
+type FontMap = HashMap<Vec<u8>, FontInfo>;
+
+/// Helper to extract the Resources dictionary from a page or Form XObject.
+fn get_resources<'a>(doc: &'a Document, dict: &'a lopdf::Dictionary) -> Option<&'a lopdf::Dictionary> {
+    let resources_obj = dict
+        .get(b"Resources")
+        .ok()
+        .or_else(|| {
+            let parent_ref = dict.get(b"Parent").ok()?;
+            let parent = resolve(doc, parent_ref).ok()?;
+            let parent_dict = parent.as_dict().ok()?;
+            parent_dict.get(b"Resources").ok()
+        })?;
+    resolve(doc, resources_obj).ok()?.as_dict().ok()
+}
+
+/// Build a font-name → decoder map from a Resources dict.
+fn build_font_map_from_resources(doc: &Document, resources: Option<&lopdf::Dictionary>) -> FontMap {
     let mut map = FontMap::new();
 
-    let fonts_dict = (|| -> Option<&lopdf::Dictionary> {
-        let page_obj = doc.get_object(page_id).ok()?;
-        let page_dict = page_obj.as_dict().ok()?;
-
-        // Resources may be on the page or inherited from parent
-        let resources_obj = page_dict
-            .get(b"Resources")
-            .ok()
-            .or_else(|| {
-                let parent_ref = page_dict.get(b"Parent").ok()?;
-                let parent = resolve(doc, parent_ref).ok()?;
-                let parent_dict = parent.as_dict().ok()?;
-                parent_dict.get(b"Resources").ok()
-            })?;
-        let resources = resolve(doc, resources_obj).ok()?.as_dict().ok()?;
-        let font_obj = resources.get(b"Font").ok()?;
-        resolve(doc, font_obj).ok()?.as_dict().ok()
-    })();
+    let fonts_dict = resources
+        .and_then(|r| r.get(b"Font").ok())
+        .and_then(|f| resolve(doc, f).ok())
+        .and_then(|f| f.as_dict().ok());
 
     if let Some(fonts) = fonts_dict {
         for (name, obj) in fonts.iter() {
-            let decoder = build_font_decoder(doc, obj);
-            map.insert(name.clone(), decoder);
+            let info = build_font_info(doc, obj);
+            map.insert(name.clone(), info);
         }
     }
 
     map
 }
 
-/// Determine the best decoder for a single font object.
-fn build_font_decoder(doc: &Document, font_obj: &Object) -> FontDecoder {
+fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
     let resolved = match resolve(doc, font_obj) {
         Ok(o) => o,
-        Err(_) => return FontDecoder::Fallback,
+        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None },
     };
     let font_dict = match resolved.as_dict() {
         Ok(d) => d,
-        Err(_) => return FontDecoder::Fallback,
+        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None },
     };
 
+    let decoder = build_font_decoder_from_dict(doc, font_dict);
+
+    let first_char = font_dict.get(b"FirstChar").ok()
+        .and_then(|o| resolve(doc, o).ok())
+        .and_then(|o| o.as_i64().ok())
+        .unwrap_or(0) as u16;
+
+    let widths = font_dict.get(b"Widths").ok()
+        .and_then(|o| resolve(doc, o).ok())
+        .and_then(|o| o.as_array().ok())
+        .map(|arr| {
+            arr.iter()
+                .map(|item| resolve(doc, item).ok().map(|o| num(o)).unwrap_or(0.0))
+                .collect::<Vec<f64>>()
+        });
+
+    FontInfo { decoder, first_char, widths }
+}
+
+/// Determine the best decoder for a single font dictionary.
+fn build_font_decoder_from_dict(doc: &Document, font_dict: &lopdf::Dictionary) -> FontDecoder {
     // 1. ToUnicode CMap is the most reliable when present.
     if let Ok(tu) = font_dict.get(b"ToUnicode") {
         if let Some(data) = get_stream_content(doc, tu) {
@@ -459,14 +496,49 @@ impl Default for TextState {
     }
 }
 
-/// Process an entire content stream and return raw text blocks.
-fn process_operations(ops: &[Operation], font_map: &FontMap) -> Vec<RawBlock> {
-    let mut blocks: Vec<RawBlock> = Vec::new();
+fn apply_text_spacing(new_tm: &[f64; 6], ts: &TextState, blocks: &mut Vec<RawBlock>, current: &mut Option<RawBlock>) {
+    if let Some(blk) = current.as_mut() {
+        if !blk.text.is_empty() {
+            let dx = new_tm[4] - ts.tm[4];
+            let dy = new_tm[5] - ts.tm[5];
+            
+            let fs_y = ts.font_size.abs() * if ts.tm[3].abs() > 0.001 { ts.tm[3].abs() } else { 1.0 };
+            let thresh_y = if fs_y > 0.1 { fs_y } else { 12.0 };
+            
+            let fs_x = ts.font_size.abs() * if ts.tm[0].abs() > 0.001 { ts.tm[0].abs() } else { 1.0 };
+            let thresh_x = if fs_x > 0.1 { fs_x } else { 12.0 };
+            
+            if dy > thresh_y || dy < -thresh_y * 2.5 {
+                blocks.push(current.take().unwrap());
+                *current = Some(RawBlock::new());
+            } else if dy.abs() > thresh_y * 0.3 {
+                blk.text.push('\n');
+            } else if dx > thresh_x * 0.25 {
+                blk.text.push(' ');
+            }
+        }
+    }
+}
+
+/// Recursively process the operations stream.
+fn process_operations(
+    doc: &Document,
+    ops: &[Operation],
+    font_map: &FontMap,
+    xobjs_dict: Option<&lopdf::Dictionary>,
+    initial_ctm: [f64; 6],
+    depth: usize,
+    blocks: &mut Vec<RawBlock>,
+) {
+    if depth > 20 {
+        return; // Guard against infinite recursion in malformed PDFs
+    }
+
     let mut ts = TextState::default();
     let mut current: Option<RawBlock> = None;
 
     // Graphics-state stack (for q / Q). We only track the CTM.
-    let mut ctm = IDENTITY;
+    let mut ctm = initial_ctm;
     let mut gs_stack: Vec<[f64; 6]> = Vec::new();
 
     for op in ops {
@@ -480,7 +552,7 @@ fn process_operations(ops: &[Operation], font_map: &FontMap) -> Vec<RawBlock> {
             }
             "cm" if op.operands.len() >= 6 => {
                 let m = mat_from_operands(&op.operands);
-                ctm = mat_mul(&ctm, &m);
+                ctm = mat_mul(&m, &ctm);
             }
 
             // ── text object ──
@@ -490,7 +562,78 @@ fn process_operations(ops: &[Operation], font_map: &FontMap) -> Vec<RawBlock> {
             }
             "ET" => {
                 if let Some(blk) = current.take() {
-                    blocks.push(blk);
+                    if !blk.text.is_empty() {
+                        blocks.push(blk);
+                    }
+                }
+            }
+
+            // ── form xobject ──
+            "Do" if !op.operands.is_empty() => {
+                if let Object::Name(ref n) = op.operands[0] {
+                    if let Some(xobjs) = xobjs_dict {
+                        if let Ok(obj_ref) = xobjs.get(n) {
+                            if let Ok(resolved) = resolve(doc, obj_ref) {
+                                if let Ok(stream) = resolved.as_stream() {
+                                    let dict = &stream.dict;
+                                    if dict.get(b"Subtype").and_then(|o| o.as_name()).unwrap_or(b"") == b"Form" {
+                                        // 1. Get Form's Matrix (default to Identity if missing)
+                                        let form_matrix = dict.get(b"Matrix").ok()
+                                            .and_then(|o| resolve(doc, o).ok())
+                                            .and_then(|o| o.as_array().ok())
+                                            .map(|arr| mat_from_operands(arr))
+                                            .unwrap_or(IDENTITY);
+                                        
+                                        // 2. Compose Form Matrix with current CTM
+                                        let effective_ctm = mat_mul(&form_matrix, &ctm);
+                                        
+                                        // 3. Resolve Form's specific resources if present, else inherit
+                                        let form_resources = dict.get(b"Resources").ok()
+                                            .and_then(|o| resolve(doc, o).ok())
+                                            .and_then(|o| o.as_dict().ok());
+                                            
+                                        let form_font_map = if let Some(res) = form_resources {
+                                            build_font_map_from_resources(doc, Some(res))
+                                        } else {
+                                            font_map.clone()
+                                        };
+                                        
+                                        let form_xobjs_dict = if let Some(res) = form_resources {
+                                            res.get(b"XObject").ok()
+                                                .and_then(|o| resolve(doc, o).ok())
+                                                .and_then(|o| o.as_dict().ok())
+                                        } else {
+                                            xobjs_dict
+                                        };
+                                        
+                                        // 4. Decode Form stream and recurse
+                                        if let Some(form_content_bytes) = get_stream_content(doc, resolved) {
+                                            if let Ok(form_content) = lopdf::content::Content::decode(&form_content_bytes) {
+                                                // If there's an active text block, push it before entering the form
+                                                if let Some(blk) = current.take() {
+                                                    if !blk.text.is_empty() {
+                                                        blocks.push(blk);
+                                                    }
+                                                }
+                                                
+                                                process_operations(
+                                                    doc,
+                                                    &form_content.operations,
+                                                    &form_font_map,
+                                                    form_xobjs_dict,
+                                                    effective_ctm,
+                                                    depth + 1,
+                                                    blocks,
+                                                );
+                                                
+                                                // No need to restore text state; 'Do' operates outside text objects.
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -509,71 +652,31 @@ fn process_operations(ops: &[Operation], font_map: &FontMap) -> Vec<RawBlock> {
             // ── text positioning ──
             "Tm" if op.operands.len() >= 6 => {
                 let new_tm = mat_from_operands(&op.operands);
-                if let Some(blk) = current.as_mut() {
-                    if !blk.text.is_empty() {
-                        let dy = new_tm[5] - ts.tm[5];
-                        let effective_fs = ts.font_size.abs() * if ts.tm[3].abs() > 0.001 { ts.tm[3].abs() } else { 1.0 };
-                        let fs_threshold = if effective_fs > 0.1 { effective_fs } else { 12.0 };
-                        
-                        if dy > fs_threshold || dy < -fs_threshold * 2.5 {
-                            blocks.push(current.take().unwrap());
-                            current = Some(RawBlock::new());
-                        }
-                    }
-                }
+                apply_text_spacing(&new_tm, &ts, blocks, &mut current);
                 ts.tm = new_tm;
                 ts.lm = ts.tm;
             }
             "Td" if op.operands.len() >= 2 => {
                 let tx = num(&op.operands[0]);
                 let ty = num(&op.operands[1]);
-                if let Some(blk) = current.as_mut() {
-                    if !blk.text.is_empty() {
-                        if ty > 0.0 || ty < -ts.font_size * 2.5 {
-                            blocks.push(current.take().unwrap());
-                            current = Some(RawBlock::new());
-                        } else {
-                            if ty.abs() > ts.font_size * 0.3 {
-                                blk.text.push('\n');
-                            } else if tx > ts.font_size * 0.25 {
-                                blk.text.push(' ');
-                            }
-                        }
-                    }
-                }
-                ts.lm = mat_translate(&ts.lm, tx, ty);
+                let new_tm = mat_translate(&ts.lm, tx, ty);
+                apply_text_spacing(&new_tm, &ts, blocks, &mut current);
+                ts.lm = new_tm;
                 ts.tm = ts.lm;
             }
             "TD" if op.operands.len() >= 2 => {
                 let tx = num(&op.operands[0]);
                 let ty = num(&op.operands[1]);
                 ts.leading = -ty;
-                if let Some(blk) = current.as_mut() {
-                    if !blk.text.is_empty() {
-                        if ty > 0.0 || ty < -ts.font_size * 2.5 {
-                            blocks.push(current.take().unwrap());
-                            current = Some(RawBlock::new());
-                        } else {
-                            blk.text.push('\n');
-                        }
-                    }
-                }
-                ts.lm = mat_translate(&ts.lm, tx, ty);
+                let new_tm = mat_translate(&ts.lm, tx, ty);
+                apply_text_spacing(&new_tm, &ts, blocks, &mut current);
+                ts.lm = new_tm;
                 ts.tm = ts.lm;
             }
             "T*" => {
-                let ty = -ts.leading;
-                if let Some(blk) = current.as_mut() {
-                    if !blk.text.is_empty() {
-                        if ty > 0.0 || ty < -ts.font_size * 2.5 {
-                            blocks.push(current.take().unwrap());
-                            current = Some(RawBlock::new());
-                        } else {
-                            blk.text.push('\n');
-                        }
-                    }
-                }
-                ts.lm = mat_translate(&ts.lm, 0.0, -ts.leading);
+                let new_tm = mat_translate(&ts.lm, 0.0, -ts.leading);
+                apply_text_spacing(&new_tm, &ts, blocks, &mut current);
+                ts.lm = new_tm;
                 ts.tm = ts.lm;
             }
 
@@ -626,10 +729,10 @@ fn process_operations(ops: &[Operation], font_map: &FontMap) -> Vec<RawBlock> {
 
     // Capture dangling block if ET was missing.
     if let Some(blk) = current {
-        blocks.push(blk);
+        if !blk.text.is_empty() {
+            blocks.push(blk);
+        }
     }
-
-    blocks
 }
 
 /// Decode + emit a simple text string, updating position and bbox.
@@ -640,9 +743,10 @@ fn show_string(
     font_map: &FontMap,
     blk: &mut RawBlock,
 ) {
-    let decoder = font_map.get(&ts.font_name).unwrap_or(&FontDecoder::Fallback);
+    let info = font_map.get(&ts.font_name);
+    let decoder = info.map(|i| &i.decoder).unwrap_or(&FontDecoder::Fallback);
     let decoded = decode_text(bytes, decoder);
-    let width = estimate_width(&decoded, ts.font_size, ts.h_scaling);
+    let width = calculate_string_width(bytes, info, ts.font_size, ts.h_scaling);
     let advance = width / (ts.h_scaling / 100.0);
 
     let comp = mat_mul(&ts.tm, ctm);
@@ -673,12 +777,13 @@ fn show_tj_array(
     font_map: &FontMap,
     blk: &mut RawBlock,
 ) {
-    let decoder = font_map.get(&ts.font_name).unwrap_or(&FontDecoder::Fallback);
+    let info = font_map.get(&ts.font_name);
+    let decoder = info.map(|i| &i.decoder).unwrap_or(&FontDecoder::Fallback);
 
     for item in arr {
         if let Some(bytes) = string_bytes(item) {
             let decoded = decode_text(bytes, decoder);
-            let width = estimate_width(&decoded, ts.font_size, ts.h_scaling);
+            let width = calculate_string_width(bytes, info, ts.font_size, ts.h_scaling);
             let advance = width / (ts.h_scaling / 100.0);
 
             let comp = mat_mul(&ts.tm, ctm);
@@ -713,10 +818,26 @@ fn show_tj_array(
     }
 }
 
-/// Rough width estimate: proportional glyph width ≈ 0.5 × font_size.
-fn estimate_width(text: &str, font_size: f64, h_scaling: f64) -> f64 {
-    let n = text.chars().count() as f64;
-    n * 0.5 * font_size.abs() * h_scaling / 100.0
+/// Calculate the exact width of a string in text space using the PDF font's /Widths array if available.
+/// Fallback to 0.5 ems for missing widths.
+fn calculate_string_width(bytes: &[u8], font_info: Option<&FontInfo>, font_size: f64, h_scaling: f64) -> f64 {
+    let mut total_width_thousandths = 0.0;
+    
+    for &byte in bytes {
+        let code = byte as u16;
+        let mut glyph_width = 500.0; // Standard fallback (0.5 ems)
+        
+        if let Some(info) = font_info {
+            if let Some(widths) = &info.widths {
+                if code >= info.first_char && (code - info.first_char) < widths.len() as u16 {
+                    glyph_width = widths[(code - info.first_char) as usize];
+                }
+            }
+        }
+        total_width_thousandths += glyph_width;
+    }
+    
+    (total_width_thousandths / 1000.0) * font_size.abs() * (h_scaling / 100.0)
 }
 
 // ── Matrix helpers (2-D affine, stored as [a b c d e f]) ────────

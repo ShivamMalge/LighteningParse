@@ -94,7 +94,7 @@ Output schema (per document):
         {
           "text": "...",
           "bbox": [x0, y0, x1, y1],
-          "section_id": "header|body|footer",
+          "section_id": "header|body|footer|footnote",
           "source": "digital|ocr"
         }
       ]
@@ -169,6 +169,7 @@ Consumes the structured JSON, not raw text. Chunker is metadata-aware:
 | Heuristic header/footer detection (not ML) | Matches v1 scope, avoids model dependency | Accuracy benchmark shows heuristic ceiling is too low |
 | rayon for page-level parallelism | Simplest parallelism model for embarrassingly parallel per-page work | Page count is usually 1 (parallelism overhead not worth it) |
 | Tesseract for OCR in v1 | Pragmatic, well-supported Rust bindings exist | M5 accuracy benchmark shows it's insufficient |
+| Simple Font /Widths extraction only (fallback 0.5 em) | CID/Type0 /W arrays are complex; standard PDF heuristic (0.5 em) is safe for missing metrics | A document with a CID font shows visibly incorrect bbox/reading-order behavior |
 
 ---
 

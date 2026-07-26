@@ -91,16 +91,58 @@ pub fn detect_headers_footers(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseEr
 
     // 4. Tag the blocks.
     for page in &mut pages {
+        // We need max_y of the page for single-page heuristics.
+        let mut page_max_y = 0.0;
+        for block in &page.blocks {
+            if block.bbox[3] > page_max_y {
+                page_max_y = block.bbox[3];
+            }
+        }
+        let page_top_10 = page_max_y * 0.90;
+        let page_bottom_10 = page_max_y * 0.10;
+        let page_bottom_30 = page_max_y * 0.30;
+
         for block in &mut page.blocks {
             let norm_text = normalize_text(&block.text);
             if norm_text.is_empty() {
                 continue;
             }
 
+            // Cross-page matches
             if block.bbox[1] > top_band_threshold && header_texts.contains(&norm_text) {
                 block.section_id = "header".into();
+                continue;
             } else if block.bbox[3] < bottom_band_threshold && footer_texts.contains(&norm_text) {
                 block.section_id = "footer".into();
+                continue;
+            }
+
+            // Single-page fallbacks (only apply to the first page to avoid mistagging top-of-page figures/tables on subsequent pages)
+            if page.page_num == 1 {
+                // Check footnote first (up to bottom 30%)
+                if block.bbox[1] < page_bottom_30 {
+                    if block.text.starts_with('*') 
+                        || block.text.starts_with('\u{2217}') 
+                        || block.text.starts_with('†') 
+                        || block.text.starts_with('‡') 
+                        || block.text.starts_with('§') 
+                    {
+                        block.section_id = "footnote".into();
+                        continue;
+                    }
+                }
+
+                // Very top blocks lacking cross-page match
+                if block.bbox[1] > page_top_10 {
+                    block.section_id = "header".into();
+                    continue;
+                }
+
+                // Very bottom blocks lacking cross-page match
+                if block.bbox[3] < page_bottom_10 {
+                    block.section_id = "footer".into();
+                    continue;
+                }
             }
         }
     }
@@ -156,17 +198,35 @@ pub fn reconstruct_reading_order(mut pages: Vec<Page>) -> Result<Vec<Page>, Pars
         let mut swaths: Vec<Vec<Block>> = Vec::new();
         let mut current_swath: Vec<Block> = Vec::new();
 
-        for block in page.blocks.drain(..) {
+        for i in 0..page.blocks.len() {
+            let block = page.blocks[i].clone();
             let block_width = block.bbox[2] - block.bbox[0];
             let is_full_width = block_width >= full_width_threshold;
 
-            if is_full_width {
+            // Check if this block has any vertical overlap with ANY OTHER block on the page.
+            let mut has_horizontal_neighbors = false;
+            for j in 0..page.blocks.len() {
+                if i == j {
+                    continue;
+                }
+                let other = &page.blocks[j];
+                // Y-overlap check
+                if block.bbox[1].max(other.bbox[1]) <= block.bbox[3].min(other.bbox[3]) {
+                    has_horizontal_neighbors = true;
+                    break;
+                }
+            }
+
+            // A block breaks the swath if it's explicitly full-width, OR if it's the only block in its Y-band (isolated).
+            let acts_as_boundary = is_full_width || !has_horizontal_neighbors;
+
+            if acts_as_boundary {
                 // Close current swath if it has blocks.
                 if !current_swath.is_empty() {
                     swaths.push(current_swath);
                     current_swath = Vec::new();
                 }
-                // Full-width blocks get their own swath to guarantee they break columns.
+                // Boundary blocks get their own swath.
                 swaths.push(vec![block]);
             } else {
                 current_swath.push(block);
@@ -175,6 +235,9 @@ pub fn reconstruct_reading_order(mut pages: Vec<Page>) -> Result<Vec<Page>, Pars
         if !current_swath.is_empty() {
             swaths.push(current_swath);
         }
+        
+        // Clear page.blocks since we cloned them out (to avoid borrow checker issues with drain + iter).
+        page.blocks.clear();
 
         // 4. Within each swath, cluster blocks into columns and sort.
         let mut ordered_blocks = Vec::with_capacity(page.blocks.capacity());
@@ -238,6 +301,11 @@ pub fn reconstruct_reading_order(mut pages: Vec<Page>) -> Result<Vec<Page>, Pars
                         b.bbox[3]
                             .partial_cmp(&a.bbox[3])
                             .unwrap_or(std::cmp::Ordering::Equal)
+                            .then_with(|| {
+                                a.bbox[0]
+                                    .partial_cmp(&b.bbox[0])
+                                    .unwrap_or(std::cmp::Ordering::Equal)
+                            })
                     });
                     (avg_x, col_blocks)
                 })

@@ -10,14 +10,14 @@ pub struct ParseResult {
 }
 
 /// Per-page result.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Page {
     pub page_num: u32,
     pub blocks: Vec<Block>,
 }
 
 /// A single text block extracted from a page.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Block {
     /// Extracted text content.
     pub text: String,
