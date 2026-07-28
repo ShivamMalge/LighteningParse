@@ -24,13 +24,13 @@ Contributor/agent instructions: [`AGENTS.md`](./AGENTS.md)
 
 ## Benchmarks
 
-LightningParse is **12.9×–240.5× faster** than pypdf/pdfplumber on digital-native (Tier 1) PDFs, with the gap widening on longer documents. Some representative results:
+LightningParse is **6.0×–93.1× faster** than pypdf/pdfplumber on digital-native (Tier 1) PDFs, with the gap widening on longer documents. Some representative results:
 
 | Document | Pages | LightningParse (median) | pypdf | pdfplumber |
 |---|---:|---:|---:|---:|
-| Multi-page IEEE paper (`ieee_template_placeholder.pdf`) | 8 | 6.04 ms | 330.73 ms (54.8× slower) | 1452.80 ms (240.5× slower) |
-| Two-column academic paper (`arxiv_twocolumn.pdf`) | 15 | 39.28 ms | 1436.14 ms (36.6× slower) | 3601.25 ms (91.7× slower) |
-| Single-page resume | 1 | 6.68 ms | 86.02 ms (12.9× slower) | 210.21 ms (31.5× slower) |
+| Multi-page IEEE paper (`ieee_template_placeholder.pdf`) | 8 | 0.61 ms | 7.89 ms (12.9× slower) | 56.82 ms (93.1× slower) |
+| Two-column academic paper (`arxiv_twocolumn.pdf`) | 15 | 41.12 ms | 951.92 ms (23.1× slower) | 2579.90 ms (62.7× slower) |
+| Single-page resume (`Shivam_FullStack.pdf`) | 1 | 6.82 ms | 82.14 ms (12.0× slower) | 208.42 ms (30.6× slower) |
 
 OCR (Tier 2) and mixed-document handling are also supported, benchmarked separately from Tier 1 — pypdf and pdfplumber can't perform OCR, so comparing their near-instant-but-empty results against LightningParse's actual OCR time would be misleading rather than informative. See `BENCHMARKS.md` for those numbers on their own terms.
 
