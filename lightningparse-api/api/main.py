@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 from typing import Dict, Any, List
 import os
@@ -33,8 +34,8 @@ async def parse_document(file: UploadFile = File(...)):
         tmp_path = tmp.name
         
     try:
-        # Calls the Rust core (GIL is released internally)
-        json_str = lightningparse.parse_pdf(tmp_path)
+        # Calls the Rust core (GIL is released internally), use threadpool to not block the event loop
+        json_str = await run_in_threadpool(lightningparse.parse_pdf, tmp_path)
         return json.loads(json_str)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

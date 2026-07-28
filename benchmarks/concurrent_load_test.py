@@ -11,9 +11,8 @@ async def send_request(client, api_url, pdf_path):
 
 async def main():
     """
-    Spawns N concurrent async workers sending requests to the FastAPI /parse endpoint.
-    If the GIL is correctly released in Rust, processing N parallel requests 
-    should take significantly less time than N sequential requests.
+    Spawns requests to the FastAPI /parse endpoint to measure GIL release.
+    Compares single-request baseline, sequential 10-request baseline, and concurrent 10-request test.
     """
     api_url = "http://localhost:8000/parse"
     pdf_path = os.path.join(
@@ -27,25 +26,43 @@ async def main():
 
     num_requests = 10
     
-    print(f"Starting concurrent load test with {num_requests} requests to {api_url}...")
-    
-    start_time = time.time()
-    
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        # 1. Warm-up / Single Request Baseline
+        print(f"--- 1. Single Request Baseline ---")
+        start_single = time.time()
+        await send_request(client, api_url, pdf_path)
+        single_elapsed = time.time() - start_single
+        print(f"Single request completed in {single_elapsed:.2f} seconds.\n")
+
+        # 2. Sequential 10-request Baseline
+        print(f"--- 2. Sequential 10-request Baseline ---")
+        start_seq = time.time()
+        for _ in range(num_requests):
+            await send_request(client, api_url, pdf_path)
+        seq_elapsed = time.time() - start_seq
+        print(f"Sequential {num_requests} requests completed in {seq_elapsed:.2f} seconds.\n")
+
+        # 3. Concurrent 10-request Test
+        print(f"--- 3. Concurrent 10-request Test ---")
+        start_conc = time.time()
         tasks = [send_request(client, api_url, pdf_path) for _ in range(num_requests)]
         results = await asyncio.gather(*tasks)
+        conc_elapsed = time.time() - start_conc
         
-    end_time = time.time()
-    elapsed = end_time - start_time
+        successes = sum(1 for r in results if r == 200)
+        print(f"Concurrent {num_requests} requests completed in {conc_elapsed:.2f} seconds.")
+        print(f"Successful requests (200 OK): {successes} / {num_requests}\n")
+        
+    print(f"--- Summary ---")
+    print(f"Expected sequential time: {single_elapsed * num_requests:.2f}s")
+    print(f"Actual sequential time: {seq_elapsed:.2f}s")
+    print(f"Actual concurrent time: {conc_elapsed:.2f}s")
+    print(f"Speedup vs Sequential: {seq_elapsed / conc_elapsed:.2f}x")
     
-    successes = sum(1 for r in results if r == 200)
-    print(f"Completed {num_requests} requests in {elapsed:.2f} seconds.")
-    print(f"Successful requests (200 OK): {successes} / {num_requests}")
-    
-    if elapsed < 2.0:
-        print("GIL release test likely PASSED: Concurrent processing was fast.")
+    if conc_elapsed < seq_elapsed * 0.95:
+        print("\nGIL release test PASSED: Concurrent processing was faster than sequential, proving GIL release.")
     else:
-        print("GIL release test might have FAILED or the system is under load.")
+        print("\nGIL release test might have FAILED: Concurrent processing was not faster (GIL might be held, or CPU is fully saturated).")
 
 if __name__ == "__main__":
     asyncio.run(main())

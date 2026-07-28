@@ -24,9 +24,15 @@ class MetadataAwareChunker:
             
             current_chunk_text = []
             current_chunk_chars = 0
+            current_chunk_section_ids = set()
             
             for block in blocks:
                 section_id = block.get("section_id", "body")
+                
+                # Exclude boilerplate from retrieval chunks
+                if section_id in ("header", "footer", "footnote"):
+                    continue
+                    
                 text = block.get("text", "").strip()
                 source = block.get("source", "digital")
                 
@@ -34,7 +40,7 @@ class MetadataAwareChunker:
                     continue
                     
                 # If we hit a header/title, or if the chunk is too large, we break the chunk
-                is_boundary = section_id in ("header", "title")
+                is_boundary = section_id in ("title",)
                 is_too_large = (current_chunk_chars + len(text) > self.max_chars_per_chunk)
                 
                 if (is_boundary or is_too_large) and current_chunk_text:
@@ -44,17 +50,19 @@ class MetadataAwareChunker:
                             page_content="\n".join(current_chunk_text),
                             metadata={
                                 "page_num": page_num,
-                                "source_type": source
+                                "source_type": source,
+                                "section_ids": list(current_chunk_section_ids)
                             }
                         )
                     )
                     current_chunk_text = []
                     current_chunk_chars = 0
+                    current_chunk_section_ids = set()
                     
                 # Add current block to chunk
-                # We optionally include the header text in the new chunk
                 current_chunk_text.append(text)
                 current_chunk_chars += len(text)
+                current_chunk_section_ids.add(section_id)
                 
             # Flush remaining text for the page
             if current_chunk_text:
@@ -63,8 +71,8 @@ class MetadataAwareChunker:
                         page_content="\n".join(current_chunk_text),
                         metadata={
                             "page_num": page_num,
-                            # source is based on the last block, good enough for page-level homogeneity 
-                            "source_type": blocks[-1].get("source", "digital") if blocks else "digital"
+                            "source_type": blocks[-1].get("source", "digital") if blocks else "digital",
+                            "section_ids": list(current_chunk_section_ids)
                         }
                     )
                 )
