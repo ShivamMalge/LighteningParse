@@ -46,8 +46,10 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
     let img = Image::from_path(image_path.to_string_lossy().as_ref())
         .map_err(|e| ParseError::OcrFailed(format!("Failed to load image for tesseract: {}", e)))?;
     
-    let mut args = Args::default();
-    args.lang = "eng".to_string();
+    let args = Args {
+        lang: "eng".to_string(),
+        ..Default::default()
+    };
 
     let tsv_output = rusty_tesseract::image_to_data(&img, &args)
         .map_err(|e| {

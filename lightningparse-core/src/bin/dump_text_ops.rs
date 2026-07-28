@@ -1,4 +1,4 @@
-use lopdf::{Document, Object};
+use lopdf::Document;
 use std::env;
 
 fn main() {

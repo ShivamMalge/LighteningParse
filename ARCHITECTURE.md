@@ -171,7 +171,7 @@ Consumes the structured JSON, not raw text. Chunker is metadata-aware:
 | OCR confidence filtering (threshold < 40) | Principled alternative to geometric heuristics. Accepts some margin noise (e.g. "S S") per v1 scope. | Noise materially degrades downstream chunking/retrieval (needs page-cropping/layout ML) |
 | Chroma for Vector Store | Pure Python, integrates well with LangChain, no external C++ dependencies | We need robust production-grade persistent indices at high scale |
 | Tesseract for OCR in v1 | Pragmatic, well-supported Rust bindings exist | M5 accuracy benchmark shows it's insufficient |
-| Simple Font /Widths extraction only (fallback 0.5 em) | CID/Type0 /W arrays are complex; standard PDF heuristic (0.5 em) is safe for missing metrics | A document with a CID font shows visibly incorrect bbox/reading-order behavior |
+| Font width extraction supports CID/Type0 /W arrays and /DW fallbacks | Generic 0.5 em fallback caused incorrect bboxes for CJK text | Complex CMap encoding (beyond Identity-H/V) is encountered |
 
 ---
 

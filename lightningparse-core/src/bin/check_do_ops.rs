@@ -45,7 +45,7 @@ fn main() {
                 for op in content.operations.iter() {
                     if op.operator == "Do" {
                         total_do_ops += 1;
-                        if let Some(name_obj) = op.operands.get(0) {
+                        if let Some(name_obj) = op.operands.first() {
                             if let Ok(name) = name_obj.as_name() {
                                 if let Some(xobjs) = xobj_dict {
                                     if let Ok(obj_ref) = xobjs.get(name) {

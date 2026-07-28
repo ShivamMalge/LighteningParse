@@ -109,6 +109,10 @@ struct FontInfo {
     decoder: FontDecoder,
     first_char: u16,
     widths: Option<Vec<f64>>,
+    is_cid: bool,
+    cid_default_width: f64,
+    cid_widths: HashMap<u16, f64>,
+    _identity_encoding: bool,
 }
 
 type FontMap = HashMap<Vec<u8>, FontInfo>;
@@ -149,11 +153,11 @@ fn build_font_map_from_resources(doc: &Document, resources: Option<&lopdf::Dicti
 fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
     let resolved = match resolve(doc, font_obj) {
         Ok(o) => o,
-        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None },
+        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None, is_cid: false, cid_default_width: 1000.0, cid_widths: HashMap::new(), _identity_encoding: false },
     };
     let font_dict = match resolved.as_dict() {
         Ok(d) => d,
-        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None },
+        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None, is_cid: false, cid_default_width: 1000.0, cid_widths: HashMap::new(), _identity_encoding: false },
     };
 
     let decoder = build_font_decoder_from_dict(doc, font_dict);
@@ -172,7 +176,66 @@ fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
                 .collect::<Vec<f64>>()
         });
 
-    FontInfo { decoder, first_char, widths }
+    let mut is_cid = false;
+    let mut cid_default_width = 1000.0;
+    let mut cid_widths = HashMap::new();
+    let mut _identity_encoding = false;
+
+    if font_dict.get(b"Subtype").and_then(|o| o.as_name()).unwrap_or(b"") == b"Type0" {
+        is_cid = true;
+
+        if let Ok(enc) = font_dict.get(b"Encoding") {
+            if let Ok(Object::Name(ref n)) = resolve(doc, enc) {
+                if n == b"Identity-H" || n == b"Identity-V" {
+                    _identity_encoding = true;
+                }
+            }
+        }
+
+        if let Some(descendants) = font_dict.get(b"DescendantFonts").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_array().ok()) {
+            if let Some(first_descendant) = descendants.first().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_dict().ok()) {
+                if let Some(dw) = first_descendant.get(b"DW").ok().and_then(|o| resolve(doc, o).ok()) {
+                    cid_default_width = num(dw);
+                }
+
+                if let Some(w_array) = first_descendant.get(b"W").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_array().ok()) {
+                    let mut i = 0;
+                    while i < w_array.len() {
+                        if let Some(c_first) = resolve(doc, &w_array[i]).ok().map(num) {
+                            let cid_start = c_first as u16;
+                            if i + 1 < w_array.len() {
+                                if let Ok(Object::Array(ref w_list)) = resolve(doc, &w_array[i + 1]) {
+                                    for (j, w_val) in w_list.iter().enumerate() {
+                                        if let Some(w) = resolve(doc, w_val).ok().map(num) {
+                                            cid_widths.insert(cid_start + j as u16, w);
+                                        }
+                                    }
+                                    i += 2;
+                                } else if i + 2 < w_array.len() {
+                                    if let Some(c_last) = resolve(doc, &w_array[i + 1]).ok().map(num) {
+                                        if let Some(w) = resolve(doc, &w_array[i + 2]).ok().map(num) {
+                                            for c in cid_start..=(c_last as u16) {
+                                                cid_widths.insert(c, w);
+                                            }
+                                        }
+                                    }
+                                    i += 3;
+                                } else {
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    FontInfo { decoder, first_char, widths, is_cid, cid_default_width, cid_widths, _identity_encoding }
 }
 
 /// Determine the best decoder for a single font dictionary.
@@ -808,18 +871,41 @@ fn show_tj_array(
 fn calculate_string_width(bytes: &[u8], font_info: Option<&FontInfo>, font_size: f64, h_scaling: f64) -> f64 {
     let mut total_width_thousandths = 0.0;
     
-    for &byte in bytes {
-        let code = byte as u16;
-        let mut glyph_width = 500.0; // Standard fallback (0.5 ems)
-        
-        if let Some(info) = font_info {
-            if let Some(widths) = &info.widths {
-                if code >= info.first_char && (code - info.first_char) < widths.len() as u16 {
-                    glyph_width = widths[(code - info.first_char) as usize];
+    if let Some(info) = font_info {
+        if info.is_cid {
+            let mut i = 0;
+            while i < bytes.len() {
+                let cid;
+                let advance;
+                if i + 1 < bytes.len() {
+                    cid = u16::from_be_bytes([bytes[i], bytes[i+1]]);
+                    advance = 2;
+                } else {
+                    cid = bytes[i] as u16;
+                    advance = 1;
                 }
+                
+                let glyph_width = info.cid_widths.get(&cid).copied().unwrap_or(info.cid_default_width);
+                total_width_thousandths += glyph_width;
+                i += advance;
+            }
+        } else {
+            for &byte in bytes {
+                let code = byte as u16;
+                let mut glyph_width = 500.0; // Standard fallback (0.5 ems)
+                
+                if let Some(widths) = &info.widths {
+                    if code >= info.first_char && (code - info.first_char) < widths.len() as u16 {
+                        glyph_width = widths[(code - info.first_char) as usize];
+                    }
+                }
+                total_width_thousandths += glyph_width;
             }
         }
-        total_width_thousandths += glyph_width;
+    } else {
+        for _ in bytes {
+            total_width_thousandths += 500.0;
+        }
     }
     
     (total_width_thousandths / 1000.0) * font_size.abs() * (h_scaling / 100.0)
