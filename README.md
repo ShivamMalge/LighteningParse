@@ -88,4 +88,4 @@ See [`AGENTS.md`](./AGENTS.md) for repo conventions, build commands, and non-neg
 
 ## License
 
-TBD.
+MIT License.
