@@ -278,6 +278,10 @@ def generate_benchmarks_md(all_results: List[Dict[str, Any]], tier_arg: str) -> 
             
         lines.append(f"## {group_name}")
         lines.append("")
+        
+        if group_name == "Tier 2 (OCR Scans)":
+            lines.append("> **Note:** Tier 2 timings are heavily dependent on rasterized image resolution — `scan-to-pdf-1785075273618.pdf` is a small ~0.1MP scan; the synthetic phone-photo fixtures are ~3.7MP (simulating a full 8.5x11\" page at 200 DPI), which explains the 12-18x timing difference. OCR time scales roughly with pixel count, not just content complexity.")
+            lines.append("")
 
         files = sorted(set(r["file"] for r in group_results))
         for filename in files:
