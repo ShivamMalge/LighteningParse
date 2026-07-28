@@ -5,12 +5,19 @@ description = "FastAPI service for LightningParse"
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
-    "pydantic"
+    "pydantic",
+    "langchain",
+    "langchain-community",
+    "langchain-openai",
+    "chromadb",
+    "langchain-chroma",
+    "python-multipart"
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-asyncio",
     "httpx"
 ]
 

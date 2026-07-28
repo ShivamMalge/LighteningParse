@@ -169,6 +169,7 @@ Consumes the structured JSON, not raw text. Chunker is metadata-aware:
 | Heuristic header/footer detection (not ML) | Matches v1 scope, avoids model dependency | Accuracy benchmark shows heuristic ceiling is too low |
 | rayon for page-level parallelism | Simplest parallelism model for embarrassingly parallel per-page work | Page count is usually 1 (parallelism overhead not worth it) |
 | OCR confidence filtering (threshold < 40) | Principled alternative to geometric heuristics. Accepts some margin noise (e.g. "S S") per v1 scope. | Noise materially degrades downstream chunking/retrieval (needs page-cropping/layout ML) |
+| Chroma for Vector Store | Pure Python, integrates well with LangChain, no external C++ dependencies | We need robust production-grade persistent indices at high scale |
 | Tesseract for OCR in v1 | Pragmatic, well-supported Rust bindings exist | M5 accuracy benchmark shows it's insufficient |
 | Simple Font /Widths extraction only (fallback 0.5 em) | CID/Type0 /W arrays are complex; standard PDF heuristic (0.5 em) is safe for missing metrics | A document with a CID font shows visibly incorrect bbox/reading-order behavior |
 
