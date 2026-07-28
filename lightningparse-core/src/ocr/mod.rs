@@ -76,6 +76,12 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
             continue;
         }
 
+        // Filter out hallucinated noise using Tesseract's confidence score (0-100)
+        // A threshold of 40 is a principled way to discard margin artifacts or smudges
+        if row.conf < 40.0 {
+            continue;
+        }
+
         let block_id = row.block_num;
         let line_id = row.line_num;
 
@@ -141,13 +147,6 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
         // Ensure bbox is [x0, y0, x1, y1] where x0 < x1 and y0 < y1
         b.bbox[1] = bottom;
         b.bbox[3] = top;
-
-        // Filter out extreme vertical noise blocks (like margin shadows misread as text)
-        let width = b.bbox[2] - b.bbox[0];
-        let height = b.bbox[3] - b.bbox[1];
-        if height > width * 3.0 && width < 50.0 {
-            continue; // Skip tall, narrow blocks (likely margin artifacts like 'BBS S S')
-        }
 
         filtered_blocks.push(b);
     }
