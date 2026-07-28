@@ -121,17 +121,36 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
         }
     }
 
-    // Note: The coordinates returned by tesseract are in pixel space (e.g. 0 to 2550 for an 8.5x11 page at 300 DPI).
-    // We should convert them to standard PDF points (72 DPI) to match digital extraction.
-    // PDF space has 0,0 at bottom-left usually, but our standard `RawBlock` outputs top-down for Y in some configs, or we can just keep it relative.
-    // Let's scale from 300 DPI to 72 DPI. (72.0 / 300.0 = 0.24)
-    // Tesseract coordinates are top-left origin.
-    for b in &mut blocks {
+    // We need to invert the Y-axis to match PDF space (where y=0 is at the bottom).
+    // We also scale from 300 DPI to 72 DPI. (72.0 / 300.0 = 0.24)
+    let img_reader = image::io::Reader::open(&image_path).map_err(|e| ParseError::OcrFailed(format!("Failed to open image for dimensions: {}", e)))?;
+    let img_dimensions = img_reader.into_dimensions().map_err(|e| ParseError::OcrFailed(format!("Failed to decode image dimensions: {}", e)))?;
+    let page_height_pt = img_dimensions.1 as f64 * 0.24;
+
+    let mut filtered_blocks = Vec::new();
+    for mut b in blocks {
         b.bbox[0] *= 0.24;
         b.bbox[1] *= 0.24;
         b.bbox[2] *= 0.24;
         b.bbox[3] *= 0.24;
+
+        // Invert Y-axis: new_y = page_height_pt - old_y
+        let top = page_height_pt - b.bbox[1];
+        let bottom = page_height_pt - b.bbox[3];
+        
+        // Ensure bbox is [x0, y0, x1, y1] where x0 < x1 and y0 < y1
+        b.bbox[1] = bottom;
+        b.bbox[3] = top;
+
+        // Filter out extreme vertical noise blocks (like margin shadows misread as text)
+        let width = b.bbox[2] - b.bbox[0];
+        let height = b.bbox[3] - b.bbox[1];
+        if height > width * 3.0 && width < 50.0 {
+            continue; // Skip tall, narrow blocks (likely margin artifacts like 'BBS S S')
+        }
+
+        filtered_blocks.push(b);
     }
 
-    Ok(blocks)
+    Ok(filtered_blocks)
 }
