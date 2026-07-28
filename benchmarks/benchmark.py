@@ -160,13 +160,21 @@ def run_pdfplumber(path: str) -> Optional[Dict[str, Any]]:
 
 def discover_corpus(tier: str) -> List[str]:
     """Return list of PDF paths in the corpus directory for the given tier."""
-    if not CORPUS_DIR.exists():
-        print(f"Corpus directory not found: {CORPUS_DIR}")
-        return []
+    pdfs = []
+    
+    # Tier 1 documents
+    if tier in ("1", "all"):
+        if CORPUS_DIR.exists():
+            pdfs.extend(sorted(str(p) for p in CORPUS_DIR.glob("*.pdf")))
+            
+    # Tier 2 / Mixed documents
+    if tier in ("2", "all"):
+        tier2_dir = Path(__file__).parent.parent / "lightningparse-core" / "tests" / "fixtures" / "tier2"
+        if tier2_dir.exists():
+            pdfs.extend(sorted(str(p) for p in tier2_dir.glob("*.pdf")))
 
-    pdfs = sorted(str(p) for p in CORPUS_DIR.glob("*.pdf"))
     if not pdfs:
-        print(f"No PDF files found in {CORPUS_DIR}")
+        print(f"No PDF files found for tier {tier}")
     return pdfs
 
 
