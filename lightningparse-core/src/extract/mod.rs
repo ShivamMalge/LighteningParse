@@ -5,14 +5,14 @@
 //! Each BT...ET text object in the content stream becomes one Block.
 
 use std::collections::HashMap;
-use std::time::Instant;
+
 
 use lopdf::content::{Content, Operation};
 use lopdf::{Document, Object, ObjectId};
 use rayon::prelude::*;
 
 use crate::errors::ParseError;
-use crate::output::{Block, DocumentMetadata, Page, ParseResult};
+use crate::output::{Block, Page};
 
 // ── Public API ──────────────────────────────────────────────────
 
@@ -168,7 +168,7 @@ fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
         .and_then(|o| o.as_array().ok())
         .map(|arr| {
             arr.iter()
-                .map(|item| resolve(doc, item).ok().map(|o| num(o)).unwrap_or(0.0))
+                .map(|item| resolve(doc, item).ok().map(num).unwrap_or(0.0))
                 .collect::<Vec<f64>>()
         });
 

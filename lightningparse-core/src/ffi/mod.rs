@@ -8,7 +8,7 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 
 use crate::errors::ParseError;
-use crate::extract;
+
 use crate::cleanup;
 
 

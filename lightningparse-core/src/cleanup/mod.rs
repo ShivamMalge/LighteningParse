@@ -120,16 +120,14 @@ pub fn detect_headers_footers(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseEr
             // Single-page fallbacks (only apply to the first page to avoid mistagging top-of-page figures/tables on subsequent pages)
             if page.page_num == 1 {
                 // Check footnote first (up to bottom 30%)
-                if block.bbox[1] < page_bottom_30 {
-                    if block.text.starts_with('*') 
-                        || block.text.starts_with('\u{2217}') 
-                        || block.text.starts_with('†') 
-                        || block.text.starts_with('‡') 
-                        || block.text.starts_with('§') 
-                    {
-                        block.section_id = "footnote".into();
-                        continue;
-                    }
+                if block.bbox[1] < page_bottom_30 && (block.text.starts_with('*') 
+                    || block.text.starts_with('\u{2217}') 
+                    || block.text.starts_with('†') 
+                    || block.text.starts_with('‡') 
+                    || block.text.starts_with('§')) 
+                {
+                    block.section_id = "footnote".into();
+                    continue;
                 }
 
                 // Very top blocks lacking cross-page match

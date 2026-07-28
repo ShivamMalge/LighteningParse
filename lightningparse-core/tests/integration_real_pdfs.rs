@@ -26,14 +26,10 @@ fn read_corpus_file(name: &str) -> String {
 
 #[test]
 fn test_real_canva_pdf_form_xobject_extraction() {
-    // Lives in tests/fixtures/tier2/, NOT benchmarks/corpus/ (Tier 1).
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push("tests");
-    path.push("fixtures");
-    path.push("tier2");
-    path.push("Shivam_FullStack.pdf");
+    // Lives in benchmarks/corpus/ (Tier 1).
+    let path = read_corpus_file("Shivam_FullStack.pdf");
 
-    let result = lightningparse::parse_pdf_to_result(path.to_str().unwrap())
+    let result = lightningparse::parse_pdf_to_result(&path)
         .expect("Shivam_FullStack.pdf should parse without error");
 
     assert_eq!(result.metadata.page_count, 1);

@@ -16,7 +16,7 @@ pub fn parse_pdf_to_result(path: &str) -> Result<ParseResult, ParseError> {
     let doc = Document::load_mem(&pdf_bytes)
         .map_err(|e| ParseError::CorruptPdf(format!("Failed to parse PDF: {e}")))?;
 
-    let mut extract_results = extract::extract_text(&doc)?;
+    let extract_results = extract::extract_text(&doc)?;
     
     let mut pages = Vec::new();
     let mut total_digital_pages = 0;
