@@ -3,7 +3,7 @@ name = "lightningparse-api"
 version = "0.1.0"
 description = "FastAPI service for LightningParse"
 dependencies = [
-    "fastapi",
+    "fastapi>=0.111.0",
     "uvicorn[standard]",
     "pydantic",
     "langchain",
