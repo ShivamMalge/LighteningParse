@@ -2,7 +2,7 @@
 
 Fast, accurate PDF parsing for RAG pipelines — a Rust extraction core (via PyO3) feeding a Python chunking/embedding/retrieval pipeline.
 
-> **Status:** early development. Benchmark numbers below are placeholders until M2 (see `PRD.md`) — no speed claims are final until backed by `benchmarks/BENCHMARKS.md`.
+> **Status:** core pipeline complete — Rust extraction, cleanup, OCR fallback, chunking, retrieval, and generation are all implemented and benchmarked end-to-end. See [`PHASES.md`](./PHASES.md) for what's built and [`BENCHMARKS.md`](./benchmarks/BENCHMARKS.md) for full results.
 
 ## Why
 
@@ -24,14 +24,34 @@ Contributor/agent instructions: [`AGENTS.md`](./AGENTS.md)
 
 ## Benchmarks
 
-Reproducible, versioned benchmark corpus and results live in [`benchmarks/`](./benchmarks). Run them yourself:
+LightningParse is **12.9×–240.5× faster** than pypdf/pdfplumber on digital-native (Tier 1) PDFs, with the gap widening on longer documents. Some representative results:
+
+| Document | Pages | LightningParse (median) | pypdf | pdfplumber |
+|---|---:|---:|---:|---:|
+| Multi-page IEEE paper (`draft10.pdf`) | 8 | 6.04 ms | 330.73 ms (54.8× slower) | 1452.80 ms (240.5× slower) |
+| Two-column academic paper (`arxiv_twocolumn.pdf`) | 15 | 39.28 ms | 1436.14 ms (36.6× slower) | 3601.25 ms (91.7× slower) |
+| Single-page resume | 1 | 6.68 ms | 86.02 ms (12.9× slower) | 210.21 ms (31.5× slower) |
+
+OCR (Tier 2) and mixed-document handling are also supported, benchmarked separately from Tier 1 — pypdf and pdfplumber can't perform OCR, so comparing their near-instant-but-empty results against LightningParse's actual OCR time would be misleading rather than informative. See `BENCHMARKS.md` for those numbers on their own terms.
+
+A concurrent-load test also confirms the Rust FFI genuinely releases Python's GIL during parsing: 10 concurrent OCR-heavy parse requests complete **4.78× faster** than running them sequentially, on an 8-core/16-thread machine.
+
+Full methodology, per-document results, and reproduction steps: [`benchmarks/BENCHMARKS.md`](./benchmarks/BENCHMARKS.md). Run them yourself:
 
 ```bash
 cd benchmarks
-python benchmark.py --all
+python benchmark.py --tier all
 ```
 
-Results are published in `benchmarks/BENCHMARKS.md` — generated, not hand-written. Tier 1 and Tier 2 results are reported separately; they measure different things and shouldn't be blended.
+Results are published in `benchmarks/BENCHMARKS.md` — generated, not hand-written.
+
+## Known Limitations
+
+- **CID/Type0 composite fonts:** glyph width lookup currently only reads `/Widths` (simple fonts); CID fonts fall back to a standard 0.5 em width, verified safe (no crash) but not pixel-precise for bbox positioning. See `ARCHITECTURE.md` decision log.
+- **OCR noise:** Tesseract confidence-based filtering removes most scan artifacts (binder shadows, margin smudges) but some low-level noise can still pass through on real-world scans. OCR output is not expected to be flawless — see `PRD.md` non-goals.
+- **Tier 2/Mixed fixture coverage:** currently validated against a small number of real scanned/mixed fixtures rather than a broad corpus. Speedup claims for Tier 1 are well-validated across multiple document types; Tier 2 performance numbers should be read as representative of the current fixtures, not a broad guarantee.
+- **Tables and complex layouts:** table extraction is flattened to text, not structured (rows/columns), in v1. Full table structure extraction is out of scope for now — see `PRD.md`.
+- **Encrypted/form PDFs:** not explicitly supported in v1.
 
 ## Install
 
@@ -58,7 +78,7 @@ for page in result["pages"]:
 
 ## Scope (v1)
 
-**In scope:** digital-native PDF extraction, header/footer removal, OCR fallback for scanned pages, metadata-aware chunking.
+**In scope:** digital-native PDF extraction, header/footer/footnote removal, OCR fallback for scanned pages, metadata-aware chunking, retrieval + LLM Q&A pipeline with citations.
 
 **Not in scope yet:** structured table extraction, encrypted/form PDFs, ML-based layout detection. See `PRD.md` §2 for the full non-goals list — these are deliberate cuts, not oversights.
 
