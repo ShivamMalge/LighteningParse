@@ -34,7 +34,7 @@ pub fn extract_text(doc: &Document) -> Result<Vec<(u32, Vec<Block>, usize)>, Par
         .par_iter()
         .map(|&(page_num, page_id)| {
             let page = extract_page(doc, page_num, page_id)?;
-            let total_chars = page.blocks.iter().map(|b| b.text.trim().chars().count()).sum();
+            let total_chars = page.blocks.iter().map(|b| b.text().trim().chars().count()).sum();
             Ok((page.page_num, page.blocks, total_chars))
         })
         .collect::<Result<Vec<(u32, Vec<Block>, usize)>, ParseError>>()?;
@@ -79,7 +79,7 @@ fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<Page
         .filter(|b| !b.text.trim().is_empty())
         .map(|b| {
             let (min_x, min_y, max_x, max_y) = b.finalise_bbox();
-            Block {
+            Block::Text {
                 text: b.text,
                 bbox: [min_x, min_y, max_x, max_y],
                 section_id: "body".into(), // Phase 1: everything is "body"
@@ -556,11 +556,9 @@ fn apply_text_spacing(new_tm: &[f64; 6], ts: &TextState, blocks: &mut Vec<RawBlo
             let fs_x = ts.font_size.abs() * if ts.tm[0].abs() > 0.001 { ts.tm[0].abs() } else { 1.0 };
             let thresh_x = if fs_x > 0.1 { fs_x } else { 12.0 };
             
-            if dy > thresh_y || dy < -thresh_y * 2.5 {
+            if dy.abs() > thresh_y * 0.3 || dx > thresh_x * 1.5 {
                 blocks.push(current.take().unwrap());
                 *current = Some(RawBlock::new());
-            } else if dy.abs() > thresh_y * 0.3 {
-                blk.text.push('\n');
             } else if dx > thresh_x * 0.25 {
                 blk.text.push(' ');
             }
@@ -747,10 +745,13 @@ fn process_operations(
                 // T* then Tj
                 ts.lm = mat_translate(&ts.lm, 0.0, -ts.leading);
                 ts.tm = ts.lm;
-                if let Some(ref mut blk) = current {
+                if let Some(blk) = current.take() {
                     if !blk.text.is_empty() {
-                        blk.text.push('\n');
+                        blocks.push(blk);
                     }
+                }
+                current = Some(RawBlock::new());
+                if let Some(ref mut blk) = current {
                     if let Some(bytes) = op.operands.first().and_then(string_bytes) {
                         show_string(bytes, &mut ts, &ctm, font_map, blk);
                     }
@@ -761,10 +762,13 @@ fn process_operations(
                 ts.char_spacing = num(&op.operands[1]);
                 ts.lm = mat_translate(&ts.lm, 0.0, -ts.leading);
                 ts.tm = ts.lm;
-                if let Some(ref mut blk) = current {
+                if let Some(blk) = current.take() {
                     if !blk.text.is_empty() {
-                        blk.text.push('\n');
+                        blocks.push(blk);
                     }
+                }
+                current = Some(RawBlock::new());
+                if let Some(ref mut blk) = current {
                     if let Some(bytes) = string_bytes(&op.operands[2]) {
                         show_string(bytes, &mut ts, &ctm, font_map, blk);
                     }
@@ -1164,15 +1168,15 @@ mod tests {
 
         let block = &result.pages[0].blocks[0];
         assert!(
-            block.text.contains("Hello World"),
+            block.text().contains("Hello World"),
             "block text '{}' should contain 'Hello World'",
-            block.text,
+            block.text(),
         );
-        assert_eq!(block.section_id, "body");
-        assert_eq!(block.source, "digital");
+        assert_eq!(block.section_id(), "body");
+        assert_eq!(block.source(), "digital");
         // bbox should be non-degenerate
-        assert!(block.bbox[2] > block.bbox[0], "x1 > x0");
-        assert!(block.bbox[3] > block.bbox[1], "y1 > y0");
+        assert!(block.bbox()[2] > block.bbox()[0], "x1 > x0");
+        assert!(block.bbox()[3] > block.bbox()[1], "y1 > y0");
     }
 
     #[test]
@@ -1192,9 +1196,9 @@ mod tests {
         assert_eq!(result.pages[1].page_num, 2);
         assert_eq!(result.pages[2].page_num, 3);
 
-        assert!(result.pages[0].blocks[0].text.contains("Page One"));
-        assert!(result.pages[1].blocks[0].text.contains("Page Two"));
-        assert!(result.pages[2].blocks[0].text.contains("Page Three"));
+        assert!(result.pages[0].blocks[0].text().contains("Page One"));
+        assert!(result.pages[1].blocks[0].text().contains("Page Two"));
+        assert!(result.pages[2].blocks[0].text().contains("Page Three"));
     }
 
     #[test]
@@ -1344,7 +1348,7 @@ mod tests {
         doc.save_to(&mut buf).unwrap();
 
         let result = extract_text_for_test(&buf).unwrap();
-        let text = &result.pages[0].blocks[0].text;
+        let text = &result.pages[0].blocks[0].text();
         assert!(text.contains("Hello"), "should contain 'Hello', got '{text}'");
         assert!(text.contains("World"), "should contain 'World', got '{text}'");
     }

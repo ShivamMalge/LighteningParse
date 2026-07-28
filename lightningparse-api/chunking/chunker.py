@@ -33,8 +33,29 @@ class MetadataAwareChunker:
                 if section_id in ("header", "footer", "footnote"):
                     continue
                     
-                text = block.get("text", "").strip()
-                source = block.get("source", "digital")
+                is_table = block.get("type") == "table"
+                
+                if is_table:
+                    # Serialize table rows to Markdown
+                    rows = block.get("rows", [])
+                    if not rows:
+                        continue
+                    # First row is treated as header (or just standard Markdown format)
+                    md_rows = []
+                    for r in rows:
+                        md_rows.append("| " + " | ".join(str(cell).replace('\n', ' ') for cell in r) + " |")
+                    
+                    if len(md_rows) > 0:
+                        # Add a separator after the first row to make it valid Markdown
+                        col_count = len(rows[0])
+                        separator = "| " + " | ".join(["---"] * col_count) + " |"
+                        md_rows.insert(1, separator)
+                        
+                    text = "\n".join(md_rows)
+                    source = block.get("source", "digital")
+                else:
+                    text = block.get("text", "").strip()
+                    source = block.get("source", "digital")
                 
                 if not text:
                     continue

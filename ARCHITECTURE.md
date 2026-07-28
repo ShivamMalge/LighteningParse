@@ -92,7 +92,19 @@ Output schema (per document):
       "page_num": 1,
       "blocks": [
         {
+          "type": "text",
           "text": "...",
+          "bbox": [x0, y0, x1, y1],
+          "section_id": "header|body|footer|footnote",
+          "source": "digital|ocr"
+        },
+        {
+          "type": "table",
+          "rows": [
+            ["Model", "Accuracy"],
+            ["Baseline", "92.4%"],
+            ["Proposed", "95.1%"]
+          ],
           "bbox": [x0, y0, x1, y1],
           "section_id": "header|body|footer|footnote",
           "source": "digital|ocr"
@@ -107,6 +119,8 @@ Output schema (per document):
   }
 }
 ```
+
+**Note on Tables**: v1 Table extraction identifies simple bordered or geometrically aligned tables with single-line cell content. Nested tables, spanned/merged cells, and multi-line cells inside tables are explicitly out of scope for v1.
 
 ### 3.2 GIL handling
 Rust-side parsing runs inside `Python::allow_threads`, releasing the GIL for the duration of the parse. This is non-negotiable — without it, FastAPI's async event loop stalls on every parse call regardless of how fast Rust is internally.

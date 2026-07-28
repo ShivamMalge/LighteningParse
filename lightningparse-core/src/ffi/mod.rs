@@ -42,6 +42,7 @@ impl From<ParseError> for PyErr {
 fn parse_pdf(py: Python<'_>, path: String) -> PyResult<String> {
     let result_json = py.allow_threads(move || -> Result<String, ParseError> {
         let mut result = crate::parse_pdf_to_result(&path)?;
+        result.pages = cleanup::table_detect::detect_tables(result.pages)?;
         result.pages = cleanup::reconstruct_reading_order(result.pages)?;
         result.pages = cleanup::detect_headers_footers(result.pages)?;
         serde_json::to_string(&result)

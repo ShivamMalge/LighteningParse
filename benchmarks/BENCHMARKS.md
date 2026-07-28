@@ -10,49 +10,49 @@
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 1 | 6.86 | 6.91 | 6.10 | 7.67 | 0.66 |
-| pypdf | 1 | 88.71 | 89.70 | 86.84 | 94.60 | 3.09 |
-| pdfplumber | 1 | 225.01 | 226.33 | 220.21 | 238.00 | 6.98 |
+| lightningparse | 1 | 6.82 | 6.80 | 6.41 | 7.05 | 0.24 |
+| pypdf | 1 | 82.14 | 86.22 | 80.67 | 100.91 | 8.52 |
+| pdfplumber | 1 | 208.42 | 210.47 | 203.62 | 225.79 | 8.82 |
 
 **Speedup:**
-- vs pypdf: **12.9×** faster
-- vs pdfplumber: **32.8×** faster
+- vs pypdf: **12.0×** faster
+- vs pdfplumber: **30.6×** faster
 
 ### arxiv_twocolumn.pdf
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 15 | 39.99 | 40.52 | 39.64 | 41.72 | 0.94 |
-| pypdf | 15 | 988.78 | 979.04 | 945.32 | 994.06 | 20.59 |
-| pdfplumber | 15 | 3931.17 | 3945.54 | 3562.86 | 4322.45 | 269.81 |
+| lightningparse | 15 | 41.12 | 40.86 | 38.70 | 42.17 | 1.36 |
+| pypdf | 15 | 951.92 | 946.61 | 912.27 | 964.99 | 20.13 |
+| pdfplumber | 15 | 2579.90 | 2619.75 | 2563.90 | 2716.40 | 68.62 |
 
 **Speedup:**
-- vs pypdf: **24.7×** faster
-- vs pdfplumber: **98.3×** faster
+- vs pypdf: **23.1×** faster
+- vs pdfplumber: **62.7×** faster
 
 ### digital_word_export.pdf
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 2 | 0.50 | 0.50 | 0.48 | 0.51 | 0.01 |
-| pypdf | 2 | 4.92 | 4.92 | 4.70 | 5.06 | 0.15 |
-| pdfplumber | 2 | 34.42 | 37.11 | 33.31 | 42.36 | 4.57 |
+| lightningparse | 2 | 0.42 | 0.44 | 0.40 | 0.50 | 0.04 |
+| pypdf | 2 | 2.53 | 2.57 | 2.49 | 2.68 | 0.09 |
+| pdfplumber | 2 | 20.44 | 20.66 | 20.33 | 21.13 | 0.38 |
 
 **Speedup:**
-- vs pypdf: **9.8×** faster
-- vs pdfplumber: **68.8×** faster
+- vs pypdf: **6.0×** faster
+- vs pdfplumber: **48.7×** faster
 
 ### ieee_template_placeholder.pdf
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 8 | 5.98 | 6.56 | 5.86 | 8.98 | 1.36 |
-| pypdf | 8 | 341.95 | 393.66 | 328.72 | 589.62 | 110.60 |
-| pdfplumber | 8 | 1513.68 | 1524.13 | 1499.51 | 1578.39 | 32.13 |
+| lightningparse | 8 | 0.61 | 0.61 | 0.59 | 0.62 | 0.01 |
+| pypdf | 8 | 7.89 | 8.06 | 7.85 | 8.68 | 0.35 |
+| pdfplumber | 8 | 56.82 | 98.68 | 53.99 | 268.20 | 94.78 |
 
 **Speedup:**
-- vs pypdf: **57.2×** faster
-- vs pdfplumber: **253.1×** faster
+- vs pypdf: **12.9×** faster
+- vs pdfplumber: **93.1×** faster
 
 ## Tier 2 (OCR Scans)
 
@@ -62,19 +62,19 @@
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 1 | 25414.19 | 25440.30 | 24350.43 | 26177.42 | 695.53 |
+| lightningparse | 1 | 24387.18 | 24507.30 | 23072.65 | 26257.68 | 1214.76 |
 
 ### phone_photo_minutes.pdf
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 1 | 17714.27 | 17652.75 | 17251.76 | 17898.14 | 245.33 |
+| lightningparse | 1 | 17501.83 | 17282.42 | 16458.82 | 17666.29 | 481.92 |
 
 ### scan-to-pdf-1785075273618.pdf
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 1 | 1440.07 | 1457.55 | 1428.65 | 1536.30 | 44.77 |
+| lightningparse | 1 | 1335.26 | 1343.27 | 1325.69 | 1364.82 | 18.16 |
 
 ## Mixed Documents
 
@@ -82,7 +82,7 @@
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 9 | 1399.30 | 1411.90 | 1396.51 | 1445.39 | 20.88 |
+| lightningparse | 9 | 1318.77 | 1317.06 | 1294.60 | 1334.23 | 14.23 |
 
 ## Concurrent Load Test
 

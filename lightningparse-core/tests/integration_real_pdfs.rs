@@ -93,7 +93,7 @@ fn test_real_latex_pdf_has_text() {
         .pages
         .iter()
         .flat_map(|p| p.blocks.iter())
-        .map(|b| b.text.as_str())
+        .map(|b| b.text())
         .collect::<Vec<_>>()
         .join(" ");
     assert!(
@@ -159,12 +159,12 @@ fn test_parallel_determinism() {
             );
             for (b1, b2) in p1.blocks.iter().zip(p2.blocks.iter()) {
                 assert_eq!(
-                    b1.text, b2.text,
+                    b1.text(), b2.text(),
                     "run {i}: text differs on page {}",
                     p1.page_num,
                 );
                 assert_eq!(
-                    b1.bbox, b2.bbox,
+                    b1.bbox(), b2.bbox(),
                     "run {i}: bbox differs on page {}",
                     p1.page_num,
                 );
@@ -195,9 +195,9 @@ fn test_mixed_document_routing() {
     let mut ocr_count = 0;
     for page in &result.pages {
         for block in &page.blocks {
-            if block.source == "digital" {
+            if block.source() == "digital" {
                 digital_count += 1;
-            } else if block.source == "ocr" {
+            } else if block.source() == "ocr" {
                 ocr_count += 1;
             }
         }

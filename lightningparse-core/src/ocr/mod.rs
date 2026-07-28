@@ -89,14 +89,14 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
 
         if block_id != current_block_id {
             if let Some(cb) = current_block.take() {
-                if !cb.text.is_empty() {
+                if !cb.text().is_empty() {
                     blocks.push(cb);
                 }
             }
             current_block_id = block_id;
             current_line_id = line_id;
             
-            current_block = Some(Block {
+            current_block = Some(Block::Text {
                 text: text.to_string(),
                 bbox: [
                     row.left as f64,
@@ -109,22 +109,22 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
             });
         } else if let Some(ref mut cb) = current_block {
             if line_id != current_line_id {
-                cb.text.push('\n');
+                cb.text_mut().unwrap().push('\n');
                 current_line_id = line_id;
             } else {
-                cb.text.push(' ');
+                cb.text_mut().unwrap().push(' ');
             }
-            cb.text.push_str(text);
+            cb.text_mut().unwrap().push_str(text);
 
-            cb.bbox[0] = cb.bbox[0].min(row.left as f64);
-            cb.bbox[1] = cb.bbox[1].min(row.top as f64);
-            cb.bbox[2] = cb.bbox[2].max((row.left + row.width) as f64);
-            cb.bbox[3] = cb.bbox[3].max((row.top + row.height) as f64);
+            cb.bbox_mut()[0] = cb.bbox_mut()[0].min(row.left as f64);
+            cb.bbox_mut()[1] = cb.bbox_mut()[1].min(row.top as f64);
+            cb.bbox_mut()[2] = cb.bbox_mut()[2].max((row.left + row.width) as f64);
+            cb.bbox_mut()[3] = cb.bbox_mut()[3].max((row.top + row.height) as f64);
         }
     }
 
     if let Some(cb) = current_block.take() {
-        if !cb.text.is_empty() {
+        if !cb.text().is_empty() {
             blocks.push(cb);
         }
     }
@@ -137,18 +137,18 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
 
     let mut filtered_blocks = Vec::new();
     for mut b in blocks {
-        b.bbox[0] *= 0.24;
-        b.bbox[1] *= 0.24;
-        b.bbox[2] *= 0.24;
-        b.bbox[3] *= 0.24;
+        b.bbox_mut()[0] *= 0.24;
+        b.bbox_mut()[1] *= 0.24;
+        b.bbox_mut()[2] *= 0.24;
+        b.bbox_mut()[3] *= 0.24;
 
         // Invert Y-axis: new_y = page_height_pt - old_y
-        let top = page_height_pt - b.bbox[1];
-        let bottom = page_height_pt - b.bbox[3];
+        let top = page_height_pt - b.bbox_mut()[1];
+        let bottom = page_height_pt - b.bbox_mut()[3];
         
         // Ensure bbox is [x0, y0, x1, y1] where x0 < x1 and y0 < y1
-        b.bbox[1] = bottom;
-        b.bbox[3] = top;
+        b.bbox_mut()[1] = bottom;
+        b.bbox_mut()[3] = top;
 
         filtered_blocks.push(b);
     }

@@ -18,15 +18,72 @@ pub struct Page {
 
 /// A single text block extracted from a page.
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Block {
-    /// Extracted text content.
-    pub text: String,
-    /// Bounding box: [x0, y0, x1, y1].
-    pub bbox: [f64; 4],
-    /// Section classification: "header", "body", or "footer".
-    pub section_id: String,
-    /// Extraction source: "digital" (Tier 1) or "ocr" (Tier 2).
-    pub source: String,
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum Block {
+    Text {
+        text: String,
+        bbox: [f64; 4],
+        section_id: String,
+        source: String,
+    },
+    Table {
+        rows: Vec<Vec<String>>,
+        bbox: [f64; 4],
+        section_id: String,
+        source: String,
+    },
+}
+
+impl Block {
+    pub fn bbox(&self) -> &[f64; 4] {
+        match self {
+            Block::Text { bbox, .. } => bbox,
+            Block::Table { bbox, .. } => bbox,
+        }
+    }
+    
+    pub fn bbox_mut(&mut self) -> &mut [f64; 4] {
+        match self {
+            Block::Text { bbox, .. } => bbox,
+            Block::Table { bbox, .. } => bbox,
+        }
+    }
+    
+    pub fn section_id(&self) -> &str {
+        match self {
+            Block::Text { section_id, .. } => section_id,
+            Block::Table { section_id, .. } => section_id,
+        }
+    }
+
+    pub fn set_section_id(&mut self, new_id: String) {
+        match self {
+            Block::Text { section_id, .. } => *section_id = new_id,
+            Block::Table { section_id, .. } => *section_id = new_id,
+        }
+    }
+
+    pub fn source(&self) -> &str {
+        match self {
+            Block::Text { source, .. } => source,
+            Block::Table { source, .. } => source,
+        }
+    }
+
+    // Helper for Text variant. Returns empty string for Table.
+    pub fn text(&self) -> &str {
+        match self {
+            Block::Text { text, .. } => text,
+            Block::Table { .. } => "",
+        }
+    }
+
+    pub fn text_mut(&mut self) -> Option<&mut String> {
+        match self {
+            Block::Text { text, .. } => Some(text),
+            Block::Table { .. } => None,
+        }
+    }
 }
 
 /// Document-level metadata.

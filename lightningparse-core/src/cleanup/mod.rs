@@ -8,6 +8,8 @@
 //! separated by full-width blocks, then clusters blocks into columns
 //! within each swath based on x-span overlap, and sorts columns left-to-right.
 
+pub mod table_detect;
+
 use std::collections::{HashMap, HashSet};
 
 use crate::errors::ParseError;
@@ -28,8 +30,8 @@ pub fn detect_headers_footers(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseEr
     let mut global_max_y = 0.0;
     for page in &pages {
         for block in &page.blocks {
-            if block.bbox[3] > global_max_y {
-                global_max_y = block.bbox[3];
+            if block.bbox()[3] > global_max_y {
+                global_max_y = block.bbox()[3];
             }
         }
     }
@@ -54,8 +56,8 @@ pub fn detect_headers_footers(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseEr
     for page in &pages {
         for block in &page.blocks {
             // Check top band
-            if block.bbox[1] > top_band_threshold {
-                let norm_text = normalize_text(&block.text);
+            if block.bbox()[1] > top_band_threshold {
+                let norm_text = normalize_text(&block.text());
                 if !norm_text.is_empty() {
                     top_band_clusters
                         .entry(norm_text)
@@ -64,8 +66,8 @@ pub fn detect_headers_footers(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseEr
                 }
             }
             // Check bottom band
-            else if block.bbox[3] < bottom_band_threshold {
-                let norm_text = normalize_text(&block.text);
+            else if block.bbox()[3] < bottom_band_threshold {
+                let norm_text = normalize_text(&block.text());
                 if !norm_text.is_empty() {
                     bottom_band_clusters
                         .entry(norm_text)
@@ -94,8 +96,8 @@ pub fn detect_headers_footers(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseEr
         // We need max_y of the page for single-page heuristics.
         let mut page_max_y = 0.0;
         for block in &page.blocks {
-            if block.bbox[3] > page_max_y {
-                page_max_y = block.bbox[3];
+            if block.bbox()[3] > page_max_y {
+                page_max_y = block.bbox()[3];
             }
         }
         let page_top_10 = page_max_y * 0.90;
@@ -103,42 +105,42 @@ pub fn detect_headers_footers(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseEr
         let page_bottom_30 = page_max_y * 0.30;
 
         for block in &mut page.blocks {
-            let norm_text = normalize_text(&block.text);
+            let norm_text = normalize_text(&block.text());
             if norm_text.is_empty() {
                 continue;
             }
 
             // Cross-page matches
-            if block.bbox[1] > top_band_threshold && header_texts.contains(&norm_text) {
-                block.section_id = "header".into();
+            if block.bbox()[1] > top_band_threshold && header_texts.contains(&norm_text) {
+                block.set_section_id("header".into());
                 continue;
-            } else if block.bbox[3] < bottom_band_threshold && footer_texts.contains(&norm_text) {
-                block.section_id = "footer".into();
+            } else if block.bbox()[3] < bottom_band_threshold && footer_texts.contains(&norm_text) {
+                block.set_section_id("footer".into());
                 continue;
             }
 
             // Single-page fallbacks (only apply to the first page to avoid mistagging top-of-page figures/tables on subsequent pages)
             if page.page_num == 1 {
                 // Check footnote first (up to bottom 30%)
-                if block.bbox[1] < page_bottom_30 && (block.text.starts_with('*') 
-                    || block.text.starts_with('\u{2217}') 
-                    || block.text.starts_with('†') 
-                    || block.text.starts_with('‡') 
-                    || block.text.starts_with('§')) 
+                if block.bbox()[1] < page_bottom_30 && (block.text().starts_with('*') 
+                    || block.text().starts_with('\u{2217}') 
+                    || block.text().starts_with('†') 
+                    || block.text().starts_with('‡') 
+                    || block.text().starts_with('§')) 
                 {
-                    block.section_id = "footnote".into();
+                    block.set_section_id("footnote".into());
                     continue;
                 }
 
                 // Very top blocks lacking cross-page match
-                if block.bbox[1] > page_top_10 {
-                    block.section_id = "header".into();
+                if block.bbox()[1] > page_top_10 {
+                    block.set_section_id("header".into());
                     continue;
                 }
 
                 // Very bottom blocks lacking cross-page match
-                if block.bbox[3] < page_bottom_10 {
-                    block.section_id = "footer".into();
+                if block.bbox()[3] < page_bottom_10 {
+                    block.set_section_id("footer".into());
                     continue;
                 }
             }
@@ -174,11 +176,11 @@ pub fn reconstruct_reading_order(mut pages: Vec<Page>) -> Result<Vec<Page>, Pars
         let mut min_x = f64::MAX;
         let mut max_x = f64::MIN;
         for block in &page.blocks {
-            if block.bbox[0] < min_x {
-                min_x = block.bbox[0];
+            if block.bbox()[0] < min_x {
+                min_x = block.bbox()[0];
             }
-            if block.bbox[2] > max_x {
-                max_x = block.bbox[2];
+            if block.bbox()[2] > max_x {
+                max_x = block.bbox()[2];
             }
         }
         let page_width = if max_x > min_x { max_x - min_x } else { 1.0 };
@@ -187,8 +189,8 @@ pub fn reconstruct_reading_order(mut pages: Vec<Page>) -> Result<Vec<Page>, Pars
         // 2. Sort blocks top-to-bottom initially (PDF y=0 is bottom, so max_y descending).
         // Use bbox[3] (max_y) as the primary vertical coordinate.
         page.blocks.sort_by(|a, b| {
-            b.bbox[3]
-                .partial_cmp(&a.bbox[3])
+            b.bbox()[3]
+                .partial_cmp(&a.bbox()[3])
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
@@ -198,7 +200,7 @@ pub fn reconstruct_reading_order(mut pages: Vec<Page>) -> Result<Vec<Page>, Pars
 
         for i in 0..page.blocks.len() {
             let block = page.blocks[i].clone();
-            let block_width = block.bbox[2] - block.bbox[0];
+            let block_width = block.bbox()[2] - block.bbox()[0];
             let is_full_width = block_width >= full_width_threshold;
 
             // Check if this block has any vertical overlap with ANY OTHER block on the page.
@@ -209,7 +211,7 @@ pub fn reconstruct_reading_order(mut pages: Vec<Page>) -> Result<Vec<Page>, Pars
                 }
                 let other = &page.blocks[j];
                 // Y-overlap check
-                if block.bbox[1].max(other.bbox[1]) <= block.bbox[3].min(other.bbox[3]) {
+                if block.bbox()[1].max(other.bbox()[1]) <= block.bbox()[3].min(other.bbox()[3]) {
                     has_horizontal_neighbors = true;
                     break;
                 }
@@ -271,8 +273,8 @@ pub fn reconstruct_reading_order(mut pages: Vec<Page>) -> Result<Vec<Page>, Pars
 
             for i in 0..n {
                 for j in (i + 1)..n {
-                    let a = &swath[i].bbox;
-                    let b = &swath[j].bbox;
+                    let a = &swath[i].bbox();
+                    let b = &swath[j].bbox();
                     // Check for x-span overlap.
                     // a overlaps b if max(a.min_x, b.min_x) <= min(a.max_x, b.max_x)
                     let overlap_x = a[0].max(b[0]) <= a[2].min(b[2]);
@@ -293,15 +295,15 @@ pub fn reconstruct_reading_order(mut pages: Vec<Page>) -> Result<Vec<Page>, Pars
             let mut col_list: Vec<(f64, Vec<Block>)> = columns
                 .into_values()
                 .map(|mut col_blocks| {
-                    let avg_x = col_blocks.iter().map(|b| b.bbox[0]).sum::<f64>() / (col_blocks.len() as f64);
+                    let avg_x = col_blocks.iter().map(|b| b.bbox()[0]).sum::<f64>() / (col_blocks.len() as f64);
                     // Sort blocks within column top-to-bottom.
                     col_blocks.sort_by(|a, b| {
-                        b.bbox[3]
-                            .partial_cmp(&a.bbox[3])
+                        b.bbox()[3]
+                            .partial_cmp(&a.bbox()[3])
                             .unwrap_or(std::cmp::Ordering::Equal)
                             .then_with(|| {
-                                a.bbox[0]
-                                    .partial_cmp(&b.bbox[0])
+                                a.bbox()[0]
+                                    .partial_cmp(&b.bbox()[0])
                                     .unwrap_or(std::cmp::Ordering::Equal)
                             })
                     });

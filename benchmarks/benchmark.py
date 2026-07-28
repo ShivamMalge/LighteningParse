@@ -66,7 +66,8 @@ def run_lightningparse(path: str) -> Dict[str, Any]:
     page_count = parsed["metadata"]["page_count"]
     total_blocks = sum(len(p["blocks"]) for p in parsed["pages"])
     total_chars = sum(
-        len(b["text"]) for p in parsed["pages"] for b in p["blocks"]
+        (sum(len(cell) for row in b.get("rows", []) for cell in row) if b.get("type") == "table" else len(b.get("text", "")))
+        for p in parsed["pages"] for b in p["blocks"]
     )
 
     return {

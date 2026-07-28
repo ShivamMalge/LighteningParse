@@ -29,7 +29,7 @@ fn test_header_footer_detection_ieee_placeholder() {
 
     for page in &result.pages {
         for block in &page.blocks {
-            match block.section_id.as_str() {
+            match block.section_id() {
                 "header" => header_count += 1,
                 "footer" => footer_count += 1,
                 "body" => body_count += 1,
@@ -54,7 +54,7 @@ fn test_reading_order_arxiv_twocolumn() {
     
     // Run full extraction and cleanup pipeline
     let mut result = lightningparse::parse_pdf_to_result(&path).unwrap();
-    result.pages = lightningparse::cleanup::reconstruct_reading_order(result.pages).unwrap();
+    result.pages = lightningparse::cleanup::reconstruct_reading_order(lightningparse::cleanup::table_detect::detect_tables(result.pages).unwrap()).unwrap();
     result.pages = lightningparse::cleanup::detect_headers_footers(result.pages).unwrap();
 
     assert!(result.metadata.page_count > 1, "Arxiv paper should be multiple pages");
@@ -71,7 +71,7 @@ fn test_reading_order_arxiv_twocolumn() {
     let mut body_count = 0;
     for page in &result.pages {
         for block in &page.blocks {
-            match block.section_id.as_str() {
+            match block.section_id() {
                 "header" => _header_count += 1,
                 "body" => body_count += 1,
                 _ => {}
@@ -90,8 +90,8 @@ fn test_reading_order_arxiv_twocolumn() {
         let mut min_x = f64::MAX;
         let mut max_x = f64::MIN;
         for block in &page.blocks {
-            if block.bbox[0] < min_x { min_x = block.bbox[0]; }
-            if block.bbox[2] > max_x { max_x = block.bbox[2]; }
+            if block.bbox()[0] < min_x { min_x = block.bbox()[0]; }
+            if block.bbox()[2] > max_x { max_x = block.bbox()[2]; }
         }
         let page_width = if max_x > min_x { max_x - min_x } else { 1.0 };
         
@@ -99,8 +99,8 @@ fn test_reading_order_arxiv_twocolumn() {
         let mut _large_left_jumps = 0;
         
         for w in page.blocks.windows(2) {
-            let prev_x = w[0].bbox[0];
-            let next_x = w[1].bbox[0];
+            let prev_x = w[0].bbox()[0];
+            let next_x = w[1].bbox()[0];
             
             let jump = next_x - prev_x;
             if jump > page_width * 0.3 {
