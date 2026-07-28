@@ -28,7 +28,7 @@ LightningParse is **12.9×–240.5× faster** than pypdf/pdfplumber on digital-n
 
 | Document | Pages | LightningParse (median) | pypdf | pdfplumber |
 |---|---:|---:|---:|---:|
-| Multi-page IEEE paper (`draft10.pdf`) | 8 | 6.04 ms | 330.73 ms (54.8× slower) | 1452.80 ms (240.5× slower) |
+| Multi-page IEEE paper (`ieee_template_placeholder.pdf`) | 8 | 6.04 ms | 330.73 ms (54.8× slower) | 1452.80 ms (240.5× slower) |
 | Two-column academic paper (`arxiv_twocolumn.pdf`) | 15 | 39.28 ms | 1436.14 ms (36.6× slower) | 3601.25 ms (91.7× slower) |
 | Single-page resume | 1 | 6.68 ms | 86.02 ms (12.9× slower) | 210.21 ms (31.5× slower) |
 

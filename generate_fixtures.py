@@ -162,6 +162,211 @@ def generate_scanned_pdfs():
     os.remove(img1_path)
     os.remove(img2_path)
 
+def generate_ieee_template_placeholder():
+    """Generate an 8-page IEEE two-column layout placeholder PDF.
+    
+    This replaces draft10.pdf as the Tier 1 multi-page fixture.
+    Structure: title page with abstract, then body pages with two-column
+    sections, references, and page numbers.
+    """
+    pdf = FPDF(format="letter")
+    pdf.set_auto_page_break(auto=True, margin=25)
+
+    # Reusable body text blocks
+    body_paragraphs = [
+        "Recent advances in document parsing have demonstrated that parallel extraction "
+        "architectures can significantly outperform traditional sequential approaches. In this "
+        "work, we present a hybrid system that combines digital-native text extraction with "
+        "optical character recognition for scanned pages, achieving consistent throughput "
+        "improvements across diverse document types.",
+
+        "The proposed pipeline operates in two tiers. Tier 1 handles digitally-authored PDFs "
+        "by directly parsing the content stream operators, reconstructing glyph positions from "
+        "the text matrix and font metrics. Tier 2 identifies pages lacking embedded text layers "
+        "and routes them through an OCR engine with confidence-based filtering to suppress noise "
+        "from margin artifacts and scanner distortion.",
+
+        "Experimental evaluation on a corpus of 50 documents spanning academic papers, invoices, "
+        "and government reports shows a median speedup of 47x over baseline Python libraries for "
+        "digital-native extraction, with no measurable accuracy regression. The OCR fallback path "
+        "correctly recovers text from 94 percent of scanned pages with confidence above the "
+        "filtering threshold.",
+
+        "Font metric resolution is critical for accurate bounding box computation. Simple fonts "
+        "use a Widths array indexed by character code minus FirstChar. Composite CID fonts require "
+        "parsing the W array from the descendant CIDFont dictionary, with DW providing a default "
+        "width for any CID not explicitly listed. Our implementation handles both Identity-H and "
+        "Identity-V encodings for CJK text.",
+
+        "Header and footer detection uses a heuristic approach: text blocks appearing in the top "
+        "or bottom 12 percent of the page, with content that repeats across three or more pages, "
+        "are tagged with section_id header or footer. This tagging preserves the content in the "
+        "output while allowing downstream consumers to filter it as needed.",
+
+        "Reading order reconstruction sorts blocks by vertical position first, then applies a "
+        "column-detection heuristic for multi-column layouts. Blocks are grouped into columns "
+        "based on their horizontal midpoint relative to the page center, ensuring that two-column "
+        "academic papers are read left-column-first, then right-column.",
+
+        "The FFI boundary between Rust and Python uses JSON serialization. While this adds a "
+        "small constant overhead, profiling confirms it accounts for less than 2 percent of total "
+        "parse time even on large documents. The GIL is released during all Rust parsing operations "
+        "to allow true parallelism in multi-threaded Python applications.",
+
+        "Future work includes structured table extraction, where grid-aligned text blocks would be "
+        "detected and output as row-column structures rather than flattened text. This requires "
+        "identifying consistent column x-positions across adjacent rows, a problem well-suited to "
+        "the existing block-level coordinate data.",
+    ]
+
+    section_titles = [
+        "I. Introduction",
+        "II. System Architecture",
+        "III. Tier 1: Digital-Native Extraction",
+        "IV. Tier 2: OCR Fallback",
+        "V. Font Metrics and Bounding Boxes",
+        "VI. Header/Footer Detection",
+        "VII. Reading Order Reconstruction",
+        "VIII. Experimental Results",
+        "IX. Discussion",
+        "X. Related Work",
+        "XI. Conclusion",
+        "XII. Future Work",
+    ]
+
+    references = [
+        "[1] A. Smith et al., \"Fast PDF parsing with Rust,\" Proc. SIGMOD, 2023.",
+        "[2] B. Jones, \"Optical character recognition: A survey,\" ACM Computing Surveys, vol. 55, 2022.",
+        "[3] C. Lee and D. Kim, \"CID font metrics in the PDF specification,\" Tech. Report, 2021.",
+        "[4] E. Brown, \"Parallel document processing pipelines,\" IEEE TKDE, vol. 34, 2022.",
+        "[5] F. Garcia et al., \"Header detection in scientific documents,\" ICDAR, 2023.",
+        "[6] G. Wang, \"Reading order in multi-column layouts,\" DAS Workshop, 2022.",
+        "[7] H. Chen, \"RAG pipelines for enterprise search,\" NAACL Industry Track, 2023.",
+        "[8] I. Patel and J. Kumar, \"Benchmarking PDF libraries,\" arXiv:2301.04567, 2023.",
+    ]
+
+    # --- Page 1: Title + Abstract ---
+    pdf.add_page()
+    pdf.set_font("Helvetica", style="B", size=16)
+    pdf.cell(0, 12, "LightningParse: A Hybrid Rust-Python Pipeline", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 12, "for High-Throughput PDF Text Extraction", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+    pdf.set_font("Helvetica", size=10)
+    pdf.cell(0, 8, "Anonymous Authors", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, "Department of Computer Science, Example University", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(6)
+
+    # Abstract
+    pdf.set_font("Helvetica", style="B", size=10)
+    pdf.cell(0, 8, "Abstract", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", style="I", size=9)
+    abstract_text = (
+        "We present LightningParse, a document parsing system that combines a Rust core for "
+        "parallel text extraction with a Python API layer for downstream NLP integration. The "
+        "system routes each page independently through either digital-native extraction or OCR "
+        "fallback based on content detection, achieving a median 47x speedup over existing Python "
+        "libraries on digital-native PDFs while maintaining equivalent accuracy. We describe the "
+        "architecture, font metric handling for CID composite fonts, and heuristic-based header "
+        "and footer detection. Evaluation on a diverse corpus demonstrates robust performance "
+        "across academic papers, invoices, and mixed-content documents."
+    )
+    pdf.multi_cell(0, 5, abstract_text, align="J")
+    pdf.ln(4)
+
+    # Two-column body starts
+    col_width = 88
+    col_gap = 10
+    left_x = pdf.l_margin
+    right_x = left_x + col_width + col_gap
+    section_idx = 0
+    para_idx = 0
+
+    def add_page_number():
+        pdf.set_y(-20)
+        pdf.set_font("Helvetica", size=9)
+        pdf.cell(0, 10, str(pdf.page_no()), align="C")
+
+    def write_two_column_content(start_section, start_para, num_sections=3):
+        nonlocal section_idx, para_idx
+        section_idx = start_section
+        para_idx = start_para
+        
+        for col_x in [left_x, right_x]:
+            pdf.set_xy(col_x, pdf.get_y() if col_x == left_x else top_y)
+            sections_in_col = 0
+            while sections_in_col < num_sections and section_idx < len(section_titles):
+                # Section heading
+                if pdf.get_y() > 230:
+                    break
+                pdf.set_x(col_x)
+                pdf.set_font("Helvetica", style="B", size=10)
+                pdf.multi_cell(col_width, 6, section_titles[section_idx], new_x="LMARGIN", new_y="NEXT")
+                pdf.set_x(col_x)
+                pdf.set_font("Helvetica", size=9)
+                if para_idx < len(body_paragraphs):
+                    pdf.multi_cell(col_width, 5, body_paragraphs[para_idx], align="J", new_x="LMARGIN", new_y="NEXT")
+                    para_idx += 1
+                pdf.ln(2)
+                section_idx += 1
+                sections_in_col += 1
+
+    # First two-column section on page 1
+    top_y = pdf.get_y()
+    write_two_column_content(0, 0, num_sections=2)
+    add_page_number()
+
+    # Pages 2-7: continue body content
+    for page_num in range(2, 8):
+        pdf.add_page()
+        top_y = pdf.t_margin
+        remaining_sections = min(3, len(section_titles) - section_idx)
+        remaining_paras = min(3, len(body_paragraphs) - para_idx)
+        
+        for col_x in [left_x, right_x]:
+            pdf.set_xy(col_x, top_y)
+            items = 0
+            while items < 2 and section_idx < len(section_titles):
+                if pdf.get_y() > 230:
+                    break
+                pdf.set_x(col_x)
+                pdf.set_font("Helvetica", style="B", size=10)
+                pdf.multi_cell(col_width, 6, section_titles[section_idx], new_x="LMARGIN", new_y="NEXT")
+                pdf.set_x(col_x)
+                pdf.set_font("Helvetica", size=9)
+                if para_idx < len(body_paragraphs):
+                    pdf.multi_cell(col_width, 5, body_paragraphs[para_idx], align="J", new_x="LMARGIN", new_y="NEXT")
+                    para_idx += 1
+                # Add a second paragraph for density
+                if para_idx < len(body_paragraphs):
+                    pdf.set_x(col_x)
+                    pdf.multi_cell(col_width, 5, body_paragraphs[para_idx], align="J", new_x="LMARGIN", new_y="NEXT")
+                    para_idx += 1
+                pdf.ln(2)
+                section_idx += 1
+                items += 1
+            # Wrap around paragraph index for more content
+            if para_idx >= len(body_paragraphs):
+                para_idx = 0
+        
+        add_page_number()
+
+    # Page 8: References
+    pdf.add_page()
+    pdf.set_font("Helvetica", style="B", size=12)
+    pdf.cell(0, 10, "References", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(4)
+    pdf.set_font("Helvetica", size=9)
+    for ref in references:
+        pdf.multi_cell(0, 5, ref, new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+    add_page_number()
+
+    output_path = os.path.join(CORPUS_DIR, "ieee_template_placeholder.pdf")
+    pdf.output(output_path)
+    print(f"Generated {output_path}")
+
+
 if __name__ == "__main__":
     generate_digital_word_export()
     generate_scanned_pdfs()
+    generate_ieee_template_placeholder()

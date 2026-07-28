@@ -8,5 +8,5 @@ def check_pdf(name, path):
     # for i, b in enumerate(p1['blocks']):
     #    print(f'  Block {i}: bbox={b["bbox"]}')
 
-check_pdf('draft10', 'benchmarks/corpus/draft10.pdf')
+check_pdf('ieee_placeholder', 'benchmarks/corpus/ieee_template_placeholder.pdf')
 check_pdf('arxiv', 'benchmarks/corpus/arxiv_twocolumn.pdf')

@@ -16,8 +16,8 @@ fn read_corpus_file(name: &str) -> String {
 }
 
 #[test]
-fn test_header_footer_detection_draft10() {
-    let path = read_corpus_file("draft10.pdf");
+fn test_header_footer_detection_ieee_placeholder() {
+    let path = read_corpus_file("ieee_template_placeholder.pdf");
     let mut result = lightningparse::parse_pdf_to_result(&path).unwrap();
     
     // Explicitly run cleanup (just in case we only test the raw extraction otherwise)
@@ -38,7 +38,7 @@ fn test_header_footer_detection_draft10() {
         }
     }
 
-    // draft10.pdf is a LaTeX document. It might have headers or footers (like page numbers).
+    // ieee_template_placeholder.pdf is a multi-page document. It might have headers or footers (like page numbers).
     // Ensure we aren't completely zeroing out the body, and it correctly tags things without deletion.
     assert!(body_count > 10, "Should have plenty of body blocks");
     

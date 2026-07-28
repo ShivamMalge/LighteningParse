@@ -42,7 +42,7 @@
 - vs pypdf: **9.8×** faster
 - vs pdfplumber: **68.8×** faster
 
-### draft10.pdf
+### ieee_template_placeholder.pdf
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|

@@ -45,13 +45,13 @@ fn test_real_canva_pdf_form_xobject_extraction() {
     );
 }
 
-// ── draft10.pdf (LaTeX-compiled, multi-page, digital-native) ────
+// ── ieee_template_placeholder.pdf (multi-page, two-column, digital-native) ────
 
 #[test]
 fn test_real_latex_pdf_parses() {
-    let path = read_corpus_file("draft10.pdf");
+    let path = read_corpus_file("ieee_template_placeholder.pdf");
     let result = lightningparse::parse_pdf_to_result(&path)
-        .expect("draft10.pdf should parse successfully");
+        .expect("ieee_template_placeholder.pdf should parse successfully");
 
     assert!(
         result.metadata.page_count >= 2,
@@ -64,7 +64,7 @@ fn test_real_latex_pdf_parses() {
 
 #[test]
 fn test_real_latex_pdf_page_order() {
-    let path = read_corpus_file("draft10.pdf");
+    let path = read_corpus_file("ieee_template_placeholder.pdf");
     let result = lightningparse::parse_pdf_to_result(&path).unwrap();
 
     for w in result.pages.windows(2) {
@@ -79,7 +79,7 @@ fn test_real_latex_pdf_page_order() {
 
 #[test]
 fn test_real_latex_pdf_has_text() {
-    let path = read_corpus_file("draft10.pdf");
+    let path = read_corpus_file("ieee_template_placeholder.pdf");
     let result = lightningparse::parse_pdf_to_result(&path).unwrap();
 
     let total_blocks: usize = result.pages.iter().map(|p| p.blocks.len()).sum();
@@ -105,7 +105,7 @@ fn test_real_latex_pdf_has_text() {
 
 #[test]
 fn test_real_latex_pdf_json_roundtrip() {
-    let path = read_corpus_file("draft10.pdf");
+    let path = read_corpus_file("ieee_template_placeholder.pdf");
     let result = lightningparse::parse_pdf_to_result(&path).unwrap();
 
     let json = serde_json::to_string(&result).expect("serialisation should work");
