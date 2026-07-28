@@ -6,57 +6,17 @@
 
 ## Tier 1 (Digital-Native)
 
-### Shivam_FullStack.pdf
+### digital_word_export.pdf
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 1 | 6.68 | 6.73 | 6.21 | 7.43 | 0.48 |
-| pypdf | 1 | 86.02 | 86.88 | 81.89 | 95.15 | 5.54 |
-| pdfplumber | 1 | 210.21 | 213.91 | 208.84 | 229.79 | 8.90 |
+| lightningparse | 2 | 0.35 | 0.37 | 0.34 | 0.40 | 0.03 |
+| pypdf | 2 | 2.62 | 2.61 | 2.42 | 2.89 | 0.19 |
+| pdfplumber | 2 | 20.34 | 22.33 | 19.96 | 30.04 | 4.33 |
 
 **Speedup:**
-- vs pypdf: **12.9×** faster
-- vs pdfplumber: **31.5×** faster
-
-### arxiv_twocolumn.pdf
-
-| Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
-|---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 15 | 39.28 | 38.95 | 38.17 | 39.61 | 0.64 |
-| pypdf | 15 | 1436.14 | 1400.07 | 1200.54 | 1553.47 | 150.94 |
-| pdfplumber | 15 | 3601.25 | 3658.87 | 3498.74 | 3915.00 | 172.25 |
-
-**Speedup:**
-- vs pypdf: **36.6×** faster
-- vs pdfplumber: **91.7×** faster
-
-### draft10.pdf
-
-| Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
-|---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 8 | 6.04 | 6.34 | 5.81 | 7.10 | 0.55 |
-| pypdf | 8 | 330.73 | 347.40 | 244.10 | 516.86 | 101.50 |
-| pdfplumber | 8 | 1452.80 | 1399.95 | 1261.18 | 1544.20 | 125.81 |
-
-**Speedup:**
-- vs pypdf: **54.8×** faster
-- vs pdfplumber: **240.5×** faster
-
-## Tier 2 (OCR Scans)
-
-### scan-to-pdf-1785075273618.pdf
-
-| Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
-|---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 1 | 1375.95 | 1387.85 | 1362.86 | 1428.57 | 26.09 |
-
-## Mixed Documents
-
-### mixed_test.pdf
-
-| Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
-|---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 9 | 1443.41 | 1444.60 | 1392.72 | 1502.75 | 39.68 |
+- vs pypdf: **7.5×** faster
+- vs pdfplumber: **58.1×** faster
 
 ## Concurrent Load Test
 
