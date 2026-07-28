@@ -6,17 +6,81 @@
 
 ## Tier 1 (Digital-Native)
 
+### Shivam_FullStack.pdf
+
+| Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
+|---------|------:|------------:|----------:|---------:|---------:|-----------:|
+| lightningparse | 1 | 6.86 | 6.91 | 6.10 | 7.67 | 0.66 |
+| pypdf | 1 | 88.71 | 89.70 | 86.84 | 94.60 | 3.09 |
+| pdfplumber | 1 | 225.01 | 226.33 | 220.21 | 238.00 | 6.98 |
+
+**Speedup:**
+- vs pypdf: **12.9×** faster
+- vs pdfplumber: **32.8×** faster
+
+### arxiv_twocolumn.pdf
+
+| Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
+|---------|------:|------------:|----------:|---------:|---------:|-----------:|
+| lightningparse | 15 | 39.99 | 40.52 | 39.64 | 41.72 | 0.94 |
+| pypdf | 15 | 988.78 | 979.04 | 945.32 | 994.06 | 20.59 |
+| pdfplumber | 15 | 3931.17 | 3945.54 | 3562.86 | 4322.45 | 269.81 |
+
+**Speedup:**
+- vs pypdf: **24.7×** faster
+- vs pdfplumber: **98.3×** faster
+
 ### digital_word_export.pdf
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 2 | 0.35 | 0.37 | 0.34 | 0.40 | 0.03 |
-| pypdf | 2 | 2.62 | 2.61 | 2.42 | 2.89 | 0.19 |
-| pdfplumber | 2 | 20.34 | 22.33 | 19.96 | 30.04 | 4.33 |
+| lightningparse | 2 | 0.50 | 0.50 | 0.48 | 0.51 | 0.01 |
+| pypdf | 2 | 4.92 | 4.92 | 4.70 | 5.06 | 0.15 |
+| pdfplumber | 2 | 34.42 | 37.11 | 33.31 | 42.36 | 4.57 |
 
 **Speedup:**
-- vs pypdf: **7.5×** faster
-- vs pdfplumber: **58.1×** faster
+- vs pypdf: **9.8×** faster
+- vs pdfplumber: **68.8×** faster
+
+### draft10.pdf
+
+| Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
+|---------|------:|------------:|----------:|---------:|---------:|-----------:|
+| lightningparse | 8 | 5.98 | 6.56 | 5.86 | 8.98 | 1.36 |
+| pypdf | 8 | 341.95 | 393.66 | 328.72 | 589.62 | 110.60 |
+| pdfplumber | 8 | 1513.68 | 1524.13 | 1499.51 | 1578.39 | 32.13 |
+
+**Speedup:**
+- vs pypdf: **57.2×** faster
+- vs pdfplumber: **253.1×** faster
+
+## Tier 2 (OCR Scans)
+
+### phone_photo_invoice.pdf
+
+| Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
+|---------|------:|------------:|----------:|---------:|---------:|-----------:|
+| lightningparse | 1 | 25414.19 | 25440.30 | 24350.43 | 26177.42 | 695.53 |
+
+### phone_photo_minutes.pdf
+
+| Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
+|---------|------:|------------:|----------:|---------:|---------:|-----------:|
+| lightningparse | 1 | 17714.27 | 17652.75 | 17251.76 | 17898.14 | 245.33 |
+
+### scan-to-pdf-1785075273618.pdf
+
+| Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
+|---------|------:|------------:|----------:|---------:|---------:|-----------:|
+| lightningparse | 1 | 1440.07 | 1457.55 | 1428.65 | 1536.30 | 44.77 |
+
+## Mixed Documents
+
+### mixed_test.pdf
+
+| Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
+|---------|------:|------------:|----------:|---------:|---------:|-----------:|
+| lightningparse | 9 | 1399.30 | 1411.90 | 1396.51 | 1445.39 | 20.88 |
 
 ## Concurrent Load Test
 

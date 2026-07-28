@@ -49,7 +49,7 @@ Results are published in `benchmarks/BENCHMARKS.md` — generated, not hand-writ
 
 - **CID/Type0 composite fonts:** glyph width lookup currently only reads `/Widths` (simple fonts); CID fonts fall back to a standard 0.5 em width, verified safe (no crash) but not pixel-precise for bbox positioning. See `ARCHITECTURE.md` decision log.
 - **OCR noise:** Tesseract confidence-based filtering removes most scan artifacts (binder shadows, margin smudges) but some low-level noise can still pass through on real-world scans. OCR output is not expected to be flawless — see `PRD.md` non-goals.
-- **Tier 2/Mixed fixture coverage:** currently validated against a small number of real scanned/mixed fixtures rather than a broad corpus. Speedup claims for Tier 1 are well-validated across multiple document types; Tier 2 performance numbers should be read as representative of the current fixtures, not a broad guarantee.
+- **Tier 2/Mixed fixture coverage:** currently validated against a small number of real scanned/mixed fixtures rather than a broad corpus. Tier 2 fixture coverage includes both a real scanned document and synthetic distortion-simulated phone photos; the latter approximate but don't fully replicate real camera artifacts (JPEG compression, optical blur, sensor noise). Speedup claims for Tier 1 are well-validated across multiple document types; Tier 2 performance numbers should be read as representative of the current fixtures, not a broad guarantee.
 - **Tables and complex layouts:** table extraction is flattened to text, not structured (rows/columns), in v1. Full table structure extraction is out of scope for now — see `PRD.md`.
 - **Encrypted/form PDFs:** not explicitly supported in v1.
 
