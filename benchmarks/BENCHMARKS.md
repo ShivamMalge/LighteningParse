@@ -4,70 +4,59 @@
 
 **Runs per file:** 5 (+ 1 warm-up)
 
-## Shivam_FullStack.pdf
+## Tier 1 (Digital-Native)
+
+### Shivam_FullStack.pdf
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 1 | 6.93 | 7.00 | 6.59 | 7.47 | 0.36 |
-| lightningparse | 1 | 8.38 | 8.00 | 6.83 | 8.87 | 0.85 |
-| pypdf | 1 | 96.13 | 100.40 | 89.68 | 123.48 | 13.81 |
-| pypdf | 1 | 120.33 | 139.18 | 105.42 | 208.59 | 42.91 |
-| pdfplumber | 1 | 228.65 | 233.80 | 226.01 | 248.89 | 9.59 |
-| pdfplumber | 1 | 351.28 | 347.79 | 282.35 | 391.68 | 41.48 |
+| lightningparse | 1 | 6.68 | 6.73 | 6.21 | 7.43 | 0.48 |
+| pypdf | 1 | 86.02 | 86.88 | 81.89 | 95.15 | 5.54 |
+| pdfplumber | 1 | 210.21 | 213.91 | 208.84 | 229.79 | 8.90 |
 
 **Speedup:**
-- vs pypdf: **13.9×** faster
-- vs pdfplumber: **33.0×** faster
-- vs pypdf: **17.4×** faster
-- vs pdfplumber: **50.7×** faster
+- vs pypdf: **12.9×** faster
+- vs pdfplumber: **31.5×** faster
 
-## arxiv_twocolumn.pdf
+### arxiv_twocolumn.pdf
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 15 | 41.49 | 41.43 | 40.06 | 42.49 | 0.88 |
-| pypdf | 15 | 1388.28 | 1388.13 | 1258.80 | 1551.57 | 112.73 |
-| pdfplumber | 15 | 3662.70 | 3726.66 | 3530.47 | 4111.29 | 227.36 |
+| lightningparse | 15 | 39.28 | 38.95 | 38.17 | 39.61 | 0.64 |
+| pypdf | 15 | 1436.14 | 1400.07 | 1200.54 | 1553.47 | 150.94 |
+| pdfplumber | 15 | 3601.25 | 3658.87 | 3498.74 | 3915.00 | 172.25 |
 
 **Speedup:**
-- vs pypdf: **33.5×** faster
-- vs pdfplumber: **88.3×** faster
+- vs pypdf: **36.6×** faster
+- vs pdfplumber: **91.7×** faster
 
-## draft10.pdf
+### draft10.pdf
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| lightningparse | 8 | 7.45 | 7.83 | 7.27 | 8.92 | 0.69 |
-| pypdf | 8 | 330.97 | 377.67 | 294.07 | 575.16 | 113.42 |
-| pdfplumber | 8 | 1405.68 | 1363.38 | 1064.34 | 1514.62 | 173.98 |
+| lightningparse | 8 | 6.04 | 6.34 | 5.81 | 7.10 | 0.55 |
+| pypdf | 8 | 330.73 | 347.40 | 244.10 | 516.86 | 101.50 |
+| pdfplumber | 8 | 1452.80 | 1399.95 | 1261.18 | 1544.20 | 125.81 |
 
 **Speedup:**
-- vs pypdf: **44.4×** faster
-- vs pdfplumber: **188.7×** faster
+- vs pypdf: **54.8×** faster
+- vs pdfplumber: **240.5×** faster
 
-## mixed_test.pdf
+## Tier 2 (OCR Scans)
+
+### scan-to-pdf-1785075273618.pdf
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| pypdf | 9 | 250.87 | 266.54 | 244.50 | 304.92 | 26.67 |
-| pdfplumber | 9 | 1483.68 | 1394.17 | 1130.57 | 1533.53 | 165.18 |
-| lightningparse | 9 | 1485.65 | 1490.45 | 1468.35 | 1520.00 | 18.99 |
+| lightningparse | 1 | 1375.95 | 1387.85 | 1362.86 | 1428.57 | 26.09 |
 
-**Speedup:**
-- vs pypdf: **0.2×** faster
-- vs pdfplumber: **1.0×** faster
+## Mixed Documents
 
-## scan-to-pdf-1785075273618.pdf
+### mixed_test.pdf
 
 | Library | Pages | Median (ms) | Mean (ms) | Min (ms) | Max (ms) | Stdev (ms) |
 |---------|------:|------------:|----------:|---------:|---------:|-----------:|
-| pypdf | 1 | 0.88 | 0.90 | 0.85 | 0.97 | 0.06 |
-| pdfplumber | 1 | 1.59 | 1.58 | 1.45 | 1.76 | 0.12 |
-| lightningparse | 1 | 1469.96 | 1470.51 | 1444.52 | 1510.23 | 25.77 |
-
-**Speedup:**
-- vs pypdf: **0.0×** faster
-- vs pdfplumber: **0.0×** faster
+| lightningparse | 9 | 1443.41 | 1444.60 | 1392.72 | 1502.75 | 39.68 |
 
 ## Concurrent Load Test
 
