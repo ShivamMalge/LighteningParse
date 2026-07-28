@@ -17,7 +17,7 @@ async def main():
     api_url = "http://localhost:8000/parse"
     pdf_path = os.path.join(
         os.path.dirname(__file__), 
-        "corpus/arxiv_twocolumn.pdf"
+        "../lightningparse-core/tests/fixtures/tier2/mixed_test.pdf"
     )
     
     if not os.path.exists(pdf_path):
@@ -26,16 +26,14 @@ async def main():
 
     num_requests = 10
     
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        # 1. Warm-up / Single Request Baseline
-        print(f"--- 1. Single Request Baseline ---")
-        start_single = time.time()
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        # 1. Untimed Warm-up Request
+        print(f"--- 1. Untimed Warm-up Request ---")
         await send_request(client, api_url, pdf_path)
-        single_elapsed = time.time() - start_single
-        print(f"Single request completed in {single_elapsed:.2f} seconds.\n")
+        print("Warm-up complete. File cache is hot.\n")
 
         # 2. Sequential 10-request Baseline
-        print(f"--- 2. Sequential 10-request Baseline ---")
+        print(f"--- 2. Sequential {num_requests}-request Baseline ---")
         start_seq = time.time()
         for _ in range(num_requests):
             await send_request(client, api_url, pdf_path)
@@ -54,9 +52,8 @@ async def main():
         print(f"Successful requests (200 OK): {successes} / {num_requests}\n")
         
     print(f"--- Summary ---")
-    print(f"Expected sequential time: {single_elapsed * num_requests:.2f}s")
-    print(f"Actual sequential time: {seq_elapsed:.2f}s")
-    print(f"Actual concurrent time: {conc_elapsed:.2f}s")
+    print(f"Sequential {num_requests} requests time: {seq_elapsed:.2f}s")
+    print(f"Concurrent {num_requests} requests time: {conc_elapsed:.2f}s")
     print(f"Speedup vs Sequential: {seq_elapsed / conc_elapsed:.2f}x")
     
     if conc_elapsed < seq_elapsed * 0.95:
