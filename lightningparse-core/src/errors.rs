@@ -19,6 +19,15 @@ pub enum ParseError {
     #[error("OCR engine error: {0}")]
     OcrEngine(String),
 
+    #[error("Header/footer processing failed: {0}")]
+    CleanupFailed(String),
+
+    #[error("OCR dependency missing: {0} (Is pdftoppm or tesseract installed?)")]
+    OcrMissingDependency(String),
+
+    #[error("OCR extraction failed: {0}")]
+    OcrFailed(String),
+
     #[error("Internal error: {0}")]
     Internal(String),
 }

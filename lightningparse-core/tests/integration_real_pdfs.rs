@@ -17,11 +17,9 @@ fn corpus_dir() -> PathBuf {
     p
 }
 
-fn read_corpus_file(name: &str) -> Vec<u8> {
+fn read_corpus_file(name: &str) -> String {
     let path = corpus_dir().join(name);
-    std::fs::read(&path).unwrap_or_else(|e| {
-        panic!("Could not read corpus file {}: {e}", path.display());
-    })
+    path.to_str().unwrap().to_string()
 }
 
 // ── Shivam_FullStack.pdf (image-based / scanned, Tier 2 — not in Tier 1 corpus) ──
@@ -34,11 +32,8 @@ fn test_real_canva_pdf_form_xobject_extraction() {
     path.push("fixtures");
     path.push("tier2");
     path.push("Shivam_FullStack.pdf");
-    let bytes = std::fs::read(&path).unwrap_or_else(|e| {
-        panic!("Could not read fixture {}: {e}", path.display());
-    });
 
-    let result = lightningparse::extract::extract_text(&bytes)
+    let result = lightningparse::parse_pdf_to_result(path.to_str().unwrap())
         .expect("Shivam_FullStack.pdf should parse without error");
 
     assert_eq!(result.metadata.page_count, 1);
@@ -58,8 +53,8 @@ fn test_real_canva_pdf_form_xobject_extraction() {
 
 #[test]
 fn test_real_latex_pdf_parses() {
-    let bytes = read_corpus_file("draft10.pdf");
-    let result = lightningparse::extract::extract_text(&bytes)
+    let path = read_corpus_file("draft10.pdf");
+    let result = lightningparse::parse_pdf_to_result(&path)
         .expect("draft10.pdf should parse successfully");
 
     assert!(
@@ -73,8 +68,8 @@ fn test_real_latex_pdf_parses() {
 
 #[test]
 fn test_real_latex_pdf_page_order() {
-    let bytes = read_corpus_file("draft10.pdf");
-    let result = lightningparse::extract::extract_text(&bytes).unwrap();
+    let path = read_corpus_file("draft10.pdf");
+    let result = lightningparse::parse_pdf_to_result(&path).unwrap();
 
     for w in result.pages.windows(2) {
         assert!(
@@ -88,8 +83,8 @@ fn test_real_latex_pdf_page_order() {
 
 #[test]
 fn test_real_latex_pdf_has_text() {
-    let bytes = read_corpus_file("draft10.pdf");
-    let result = lightningparse::extract::extract_text(&bytes).unwrap();
+    let path = read_corpus_file("draft10.pdf");
+    let result = lightningparse::parse_pdf_to_result(&path).unwrap();
 
     let total_blocks: usize = result.pages.iter().map(|p| p.blocks.len()).sum();
     assert!(
@@ -114,8 +109,8 @@ fn test_real_latex_pdf_has_text() {
 
 #[test]
 fn test_real_latex_pdf_json_roundtrip() {
-    let bytes = read_corpus_file("draft10.pdf");
-    let result = lightningparse::extract::extract_text(&bytes).unwrap();
+    let path = read_corpus_file("draft10.pdf");
+    let result = lightningparse::parse_pdf_to_result(&path).unwrap();
 
     let json = serde_json::to_string(&result).expect("serialisation should work");
     let val: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -140,18 +135,19 @@ fn test_real_latex_pdf_json_roundtrip() {
 
 #[test]
 fn test_parallel_determinism() {
-    let bytes = read_corpus_file("draft10.pdf");
+    let path = read_corpus_file("arxiv_twocolumn.pdf");
 
-    // Run extraction 5 times; compare page/block content (not timing metadata).
-    let first = lightningparse::extract::extract_text(&bytes).unwrap();
+    // Process using our multi-threaded pipeline
+    let first = lightningparse::parse_pdf_to_result(&path).unwrap();
 
-    for i in 1..5 {
-        let r = lightningparse::extract::extract_text(&bytes).unwrap();
+    // Process multiple times to verify thread stability
+    for i in 0..5 {
+        let r = lightningparse::parse_pdf_to_result(&path).unwrap();
 
         assert_eq!(
             first.pages.len(),
             r.pages.len(),
-            "run {i}: page count differs",
+            "run count differs",
         );
 
         for (p1, p2) in first.pages.iter().zip(r.pages.iter()) {
@@ -180,3 +176,38 @@ fn test_parallel_determinism() {
         }
     }
 }
+
+// -- Mixed PDF Test ----
+
+#[test]
+fn test_mixed_document_routing() {
+    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    path.push("tests");
+    path.push("fixtures");
+    path.push("tier2");
+    path.push("mixed_test.pdf");
+
+    // The mixed PDF contains 8 digital pages and 1 scanned page.
+    let result = lightningparse::parse_pdf_to_result(path.to_str().unwrap())
+        .expect("mixed_test.pdf should parse successfully");
+
+    assert_eq!(result.metadata.tier, "mixed");
+    assert_eq!(result.metadata.page_count, 9);
+    assert_eq!(result.pages.len(), 9);
+
+    let mut digital_count = 0;
+    let mut ocr_count = 0;
+    for page in &result.pages {
+        for block in &page.blocks {
+            if block.source == "digital" {
+                digital_count += 1;
+            } else if block.source == "ocr" {
+                ocr_count += 1;
+            }
+        }
+    }
+    
+    assert!(digital_count > 0, "Expected digital blocks, found none");
+    assert!(ocr_count > 0, "Expected OCR blocks, found none");
+}
+

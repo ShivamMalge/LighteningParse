@@ -11,10 +11,13 @@ use crate::errors::ParseError;
 use crate::extract;
 use crate::cleanup;
 
+
 // Python exception types mapped from ParseError variants.
 create_exception!(lightningparse, CorruptPdfError, pyo3::exceptions::PyException);
 create_exception!(lightningparse, UnsupportedPdfError, pyo3::exceptions::PyException);
 create_exception!(lightningparse, OcrEngineError, pyo3::exceptions::PyException);
+create_exception!(lightningparse, OcrMissingDependencyError, pyo3::exceptions::PyException);
+create_exception!(lightningparse, OcrFailedError, pyo3::exceptions::PyException);
 
 impl From<ParseError> for PyErr {
     fn from(err: ParseError) -> PyErr {
@@ -22,7 +25,10 @@ impl From<ParseError> for PyErr {
             ParseError::CorruptPdf(msg) => CorruptPdfError::new_err(msg),
             ParseError::UnsupportedPdf(msg) => UnsupportedPdfError::new_err(msg),
             ParseError::OcrEngine(msg) => OcrEngineError::new_err(msg),
+            ParseError::OcrMissingDependency(msg) => OcrMissingDependencyError::new_err(msg),
+            ParseError::OcrFailed(msg) => OcrFailedError::new_err(msg),
             ParseError::Io(e) => PyRuntimeError::new_err(format!("IO error: {e}")),
+            ParseError::CleanupFailed(msg) => PyRuntimeError::new_err(format!("Cleanup failed: {msg}")),
             ParseError::Internal(msg) => PyRuntimeError::new_err(format!("Internal error: {msg}")),
         }
     }
@@ -35,8 +41,7 @@ impl From<ParseError> for PyErr {
 #[pyo3(signature = (path))]
 fn parse_pdf(py: Python<'_>, path: String) -> PyResult<String> {
     let result_json = py.allow_threads(move || -> Result<String, ParseError> {
-        let pdf_bytes = std::fs::read(&path).map_err(ParseError::Io)?;
-        let mut result = extract::extract_text(&pdf_bytes)?;
+        let mut result = crate::parse_pdf_to_result(&path)?;
         result.pages = cleanup::reconstruct_reading_order(result.pages)?;
         result.pages = cleanup::detect_headers_footers(result.pages)?;
         serde_json::to_string(&result)
@@ -56,5 +61,7 @@ fn lightningparse(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.py().get_type_bound::<UnsupportedPdfError>(),
     )?;
     m.add("OcrEngineError", m.py().get_type_bound::<OcrEngineError>())?;
+    m.add("OcrMissingDependencyError", m.py().get_type_bound::<OcrMissingDependencyError>())?;
+    m.add("OcrFailedError", m.py().get_type_bound::<OcrFailedError>())?;
     Ok(())
 }

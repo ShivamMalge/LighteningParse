@@ -13,3 +13,7 @@ dev = [
     "pytest",
     "httpx"
 ]
+
+[tool.setuptools]
+packages = ["api", "chunking", "pipeline"]
+

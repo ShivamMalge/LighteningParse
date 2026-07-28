@@ -10,17 +10,15 @@ fn corpus_dir() -> PathBuf {
     p
 }
 
-fn read_corpus_file(name: &str) -> Vec<u8> {
+fn read_corpus_file(name: &str) -> String {
     let path = corpus_dir().join(name);
-    std::fs::read(&path).unwrap_or_else(|e| {
-        panic!("Could not read corpus file {}: {e}", path.display());
-    })
+    path.to_str().unwrap().to_string()
 }
 
 #[test]
 fn test_header_footer_detection_draft10() {
-    let bytes = read_corpus_file("draft10.pdf");
-    let mut result = lightningparse::extract::extract_text(&bytes).unwrap();
+    let path = read_corpus_file("draft10.pdf");
+    let mut result = lightningparse::parse_pdf_to_result(&path).unwrap();
     
     // Explicitly run cleanup (just in case we only test the raw extraction otherwise)
     result.pages = lightningparse::cleanup::detect_headers_footers(result.pages).unwrap();
@@ -52,10 +50,10 @@ fn test_header_footer_detection_draft10() {
 
 #[test]
 fn test_reading_order_arxiv_twocolumn() {
-    let bytes = read_corpus_file("arxiv_twocolumn.pdf");
+    let path = read_corpus_file("arxiv_twocolumn.pdf");
     
     // Run full extraction and cleanup pipeline
-    let mut result = lightningparse::extract::extract_text(&bytes).unwrap();
+    let mut result = lightningparse::parse_pdf_to_result(&path).unwrap();
     result.pages = lightningparse::cleanup::reconstruct_reading_order(result.pages).unwrap();
     result.pages = lightningparse::cleanup::detect_headers_footers(result.pages).unwrap();
 

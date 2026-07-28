@@ -23,41 +23,26 @@ use crate::output::{Block, DocumentMetadata, Page, ParseResult};
 /// to guarantee deterministic document-order output.
 /// All pages are treated as Tier 1 (digital-native). Header/footer tagging
 /// and OCR fallback are not wired up yet (Phase 4 / Phase 5).
-pub fn extract_text(pdf_bytes: &[u8]) -> Result<ParseResult, ParseError> {
-    if pdf_bytes.is_empty() {
-        return Err(ParseError::CorruptPdf("PDF data is empty".into()));
-    }
-
-    let start = Instant::now();
-
-    let doc = Document::load_mem(pdf_bytes)
-        .map_err(|e| ParseError::CorruptPdf(format!("Failed to parse PDF: {e}")))?;
-
+pub fn extract_text(doc: &Document) -> Result<Vec<(u32, Vec<Block>, usize)>, ParseError> {
     let pages_map = doc.get_pages(); // BTreeMap<u32, ObjectId>
-    let page_count = pages_map.len() as u32;
 
     // Collect entries so rayon can partition them across threads.
     let entries: Vec<(u32, ObjectId)> = pages_map.iter().map(|(&n, &id)| (n, id)).collect();
 
     // Extract pages in parallel; collect results and propagate first error.
-    let mut pages: Vec<Page> = entries
+    let mut results: Vec<(u32, Vec<Block>, usize)> = entries
         .par_iter()
-        .map(|&(page_num, page_id)| extract_page(&doc, page_num, page_id))
-        .collect::<Result<Vec<Page>, ParseError>>()?;
+        .map(|&(page_num, page_id)| {
+            let page = extract_page(doc, page_num, page_id)?;
+            let total_chars = page.blocks.iter().map(|b| b.text.trim().chars().count()).sum();
+            Ok((page.page_num, page.blocks, total_chars))
+        })
+        .collect::<Result<Vec<(u32, Vec<Block>, usize)>, ParseError>>()?;
 
     // Sort by page_num — parallel execution may reorder results.
-    pages.sort_by_key(|p| p.page_num);
+    results.sort_by_key(|p| p.0);
 
-    let parse_time_ms = start.elapsed().as_millis() as u64;
-
-    Ok(ParseResult {
-        pages,
-        metadata: DocumentMetadata {
-            tier: "digital".into(),
-            page_count,
-            parse_time_ms,
-        },
-    })
+    Ok(results)
 }
 
 // ── Per-page extraction ─────────────────────────────────────────
@@ -431,12 +416,12 @@ fn win_ansi_char(b: u8) -> char {
 // ── Content-stream processing ───────────────────────────────────
 
 /// Accumulated text block collected between BT...ET.
-struct RawBlock {
-    text: String,
-    min_x: f64,
-    min_y: f64,
-    max_x: f64,
-    max_y: f64,
+pub struct RawBlock {
+    pub text: String,
+    pub min_x: f64,
+    pub min_y: f64,
+    pub max_x: f64,
+    pub max_y: f64,
 }
 
 impl RawBlock {
@@ -1021,6 +1006,27 @@ mod tests {
         buf
     }
 
+    // Helper for tests to emulate the old API
+    fn extract_text_for_test(pdf_bytes: &[u8]) -> Result<crate::output::ParseResult, ParseError> {
+        if pdf_bytes.is_empty() {
+            return Err(ParseError::CorruptPdf("PDF data is empty".into()));
+        }
+        let doc = Document::load_mem(pdf_bytes).map_err(|e| ParseError::CorruptPdf(e.to_string()))?;
+        let pages_tuples = extract_text(&doc)?;
+        let mut pages = Vec::new();
+        for (page_num, blocks, _) in pages_tuples {
+            pages.push(crate::output::Page { page_num, blocks });
+        }
+        Ok(crate::output::ParseResult {
+            pages,
+            metadata: crate::output::DocumentMetadata {
+                tier: "digital".to_string(),
+                page_count: doc.get_pages().len() as u32,
+                parse_time_ms: 0,
+            }
+        })
+    }
+
     /// Build a valid PDF whose single page has an empty content stream.
     fn make_empty_page_pdf() -> Vec<u8> {
         let mut doc = Document::with_version("1.5");
@@ -1062,7 +1068,7 @@ mod tests {
     #[test]
     fn test_valid_single_page() {
         let pdf = make_pdf(&[("Hello World", 72.0, 700.0)]);
-        let result = extract_text(&pdf).expect("should parse valid PDF");
+        let result = extract_text_for_test(&pdf).expect("should parse valid PDF");
 
         assert_eq!(result.metadata.page_count, 1);
         assert_eq!(result.metadata.tier, "digital");
@@ -1090,7 +1096,7 @@ mod tests {
             ("Page Two", 72.0, 700.0),
             ("Page Three", 72.0, 700.0),
         ]);
-        let result = extract_text(&pdf).expect("should parse multi-page PDF");
+        let result = extract_text_for_test(&pdf).expect("should parse multi-page PDF");
 
         assert_eq!(result.metadata.page_count, 3);
         assert_eq!(result.pages.len(), 3);
@@ -1108,7 +1114,7 @@ mod tests {
     #[test]
     fn test_empty_page() {
         let pdf = make_empty_page_pdf();
-        let result = extract_text(&pdf).expect("empty page is valid");
+        let result = extract_text_for_test(&pdf).expect("empty page is valid");
 
         assert_eq!(result.metadata.page_count, 1);
         assert!(
@@ -1119,7 +1125,7 @@ mod tests {
 
     #[test]
     fn test_empty_bytes_returns_error() {
-        let result = extract_text(b"");
+        let result = extract_text_for_test(b"");
         assert!(result.is_err(), "empty bytes must be Err");
         match result.unwrap_err() {
             ParseError::CorruptPdf(_) => {} // expected
@@ -1130,7 +1136,7 @@ mod tests {
     #[test]
     fn test_corrupted_bytes_returns_error() {
         let garbage = b"this is not a PDF at all";
-        let result = extract_text(garbage);
+        let result = extract_text_for_test(garbage);
         assert!(result.is_err(), "garbage bytes must be Err");
         match result.unwrap_err() {
             ParseError::CorruptPdf(_) => {}
@@ -1143,7 +1149,7 @@ mod tests {
         let full = make_pdf(&[("Truncated", 72.0, 700.0)]);
         // Take only the first 50 bytes — a truncated header.
         let truncated = &full[..50.min(full.len())];
-        let result = extract_text(truncated);
+        let result = extract_text_for_test(truncated);
         assert!(result.is_err(), "truncated PDF must be Err");
     }
 
@@ -1159,14 +1165,14 @@ mod tests {
         ];
         for pat in &patterns {
             // Must never panic — Ok or Err are both fine.
-            let _ = extract_text(pat);
+            let _ = extract_text_for_test(pat);
         }
     }
 
     #[test]
     fn test_json_schema_matches_architecture() {
         let pdf = make_pdf(&[("Schema test", 100.0, 500.0)]);
-        let result = extract_text(&pdf).unwrap();
+        let result = extract_text_for_test(&pdf).unwrap();
         let json_str = serde_json::to_string(&result).expect("serialization must work");
         let val: serde_json::Value = serde_json::from_str(&json_str).unwrap();
 
@@ -1251,7 +1257,7 @@ mod tests {
         let mut buf = Vec::new();
         doc.save_to(&mut buf).unwrap();
 
-        let result = extract_text(&buf).unwrap();
+        let result = extract_text_for_test(&buf).unwrap();
         let text = &result.pages[0].blocks[0].text;
         assert!(text.contains("Hello"), "should contain 'Hello', got '{text}'");
         assert!(text.contains("World"), "should contain 'World', got '{text}'");
