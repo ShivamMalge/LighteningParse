@@ -1,9 +1,7 @@
 use crate::errors::ParseError;
 use crate::output::{Block, Page};
-use std::collections::BTreeMap;
 
 struct CandidateRow {
-    max_y: f64,
     blocks: Vec<Block>,
 }
 
@@ -39,7 +37,7 @@ pub fn detect_tables(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseError> {
                 if (by - my).abs() <= y_tolerance {
                     current_row.push(block);
                 } else {
-                    candidate_rows.push(CandidateRow { max_y: my, blocks: current_row });
+                    candidate_rows.push(CandidateRow { blocks: current_row });
                     current_row = vec![block];
                     current_max_y = Some(by);
                 }
@@ -49,7 +47,7 @@ pub fn detect_tables(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseError> {
             }
         }
         if !current_row.is_empty() {
-            candidate_rows.push(CandidateRow { max_y: current_max_y.unwrap(), blocks: current_row });
+            candidate_rows.push(CandidateRow { blocks: current_row });
         }
 
         // 3. Filter rows (tables need columns, so > 1 block)
@@ -82,7 +80,6 @@ pub fn detect_tables(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseError> {
                 
                 // Count matching column boundaries (min_x)
                 let mut matches = 0;
-                let x_tolerance = 4.0;
                 
                 for b1 in &r1_sorted {
                     for b2 in &r2_sorted {
@@ -189,7 +186,7 @@ pub fn detect_tables(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseError> {
                 // Not a table, just add the individual blocks from the entire run
                 // Skip the whole run to avoid O(N^2) backtracking
                 for r in 0..table_run {
-                    final_blocks.extend(candidate_rows[i + r].blocks.drain(..));
+                    final_blocks.append(&mut candidate_rows[i + r].blocks);
                 }
                 i += table_run;
             }

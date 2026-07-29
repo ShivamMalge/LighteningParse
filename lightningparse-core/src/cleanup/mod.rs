@@ -57,7 +57,7 @@ pub fn detect_headers_footers(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseEr
         for block in &page.blocks {
             // Check top band
             if block.bbox()[1] > top_band_threshold {
-                let norm_text = normalize_text(&block.text());
+                let norm_text = normalize_text(block.text());
                 if !norm_text.is_empty() {
                     top_band_clusters
                         .entry(norm_text)
@@ -67,7 +67,7 @@ pub fn detect_headers_footers(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseEr
             }
             // Check bottom band
             else if block.bbox()[3] < bottom_band_threshold {
-                let norm_text = normalize_text(&block.text());
+                let norm_text = normalize_text(block.text());
                 if !norm_text.is_empty() {
                     bottom_band_clusters
                         .entry(norm_text)
@@ -105,7 +105,7 @@ pub fn detect_headers_footers(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseEr
         let page_bottom_30 = page_max_y * 0.30;
 
         for block in &mut page.blocks {
-            let norm_text = normalize_text(&block.text());
+            let norm_text = normalize_text(block.text());
             if norm_text.is_empty() {
                 continue;
             }
