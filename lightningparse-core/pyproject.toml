@@ -4,12 +4,21 @@ build-backend = "maturin"
 
 [project]
 name = "lightningparse"
-version = "0.1.0"
+version = "0.2.0"
+description = "Fast, accurate PDF parsing for RAG pipelines — Rust extraction core with Python bindings"
+readme = "../README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Shivam Malge" }
+]
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Text Processing",
 ]
 
 [tool.maturin]
