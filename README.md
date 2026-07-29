@@ -4,6 +4,14 @@ Fast, accurate PDF parsing for RAG pipelines — a Rust extraction core (via PyO
 
 > **Status:** core pipeline complete — Rust extraction, cleanup, OCR fallback, chunking, retrieval, and generation are all implemented and benchmarked end-to-end. See [`PHASES.md`](./PHASES.md) for what's built and [`BENCHMARKS.md`](./benchmarks/BENCHMARKS.md) for full results.
 
+## What's New in v0.2.0
+
+- **Structured table extraction**: tables with detected captions are now parsed into structured row/column data instead of flat text, with markdown-formatted output in RAG chunks
+- **CID/Type0 composite font support**: proper `/W` and `/DW` array parsing for embedded CJK and other composite fonts (previously fell back to a fixed 0.5em width)
+- **New robustness fixtures**: added synthetic distorted-scan and Word-export test cases to broaden Tier 2/Tier 1 coverage
+- **Fixed**: a performance regression introduced during table-detection development (`O(N²)` → `O(N)`)
+- **Fixed**: a false-positive table detection issue that was incorrectly merging multi-author affiliation blocks
+
 ## Why
 
 Traditional Python PDF libraries (PyPDF2, pdfplumber, PyMuPDF) are GIL-bound and process pages sequentially, which becomes a bottleneck in RAG ingestion pipelines. LightningParse pushes extraction, header/footer cleanup, and OCR fallback into Rust, parallelized across pages, and returns structured JSON that Python can chunk with page/section metadata intact.
