@@ -113,7 +113,7 @@ fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<Page
             let (min_x, min_y, max_x, max_y) = b.finalise_bbox();
             Block::Text {
                 text: b.text,
-                spans: b.spans,
+                spans: coalesce_spans(b.spans),
                 bbox: [min_x, min_y, max_x, max_y],
                 section_id: "body".into(), // Phase 1: everything is "body"
                 source: "digital".into(),
@@ -122,6 +122,20 @@ fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<Page
         .collect();
 
     Ok(Page { page_num, blocks })
+}
+
+fn coalesce_spans(spans: Vec<Span>) -> Vec<Span> {
+    let mut coalesced: Vec<Span> = Vec::new();
+    for span in spans {
+        if let Some(last) = coalesced.last_mut() {
+            if last.bold == span.bold && (last.font_size - span.font_size).abs() < 0.01 {
+                last.end = last.end.max(span.end);
+                continue;
+            }
+        }
+        coalesced.push(span);
+    }
+    coalesced
 }
 
 // ── Font encoding ───────────────────────────────────────────────
