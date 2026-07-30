@@ -94,6 +94,14 @@ Output schema (per document):
         {
           "type": "text",
           "text": "...",
+          "spans": [
+            {
+              "start": 0,
+              "end": 3,
+              "bold": true,
+              "font_size": 12.0
+            }
+          ],
           "bbox": [x0, y0, x1, y1],
           "section_id": "header|body|footer|footnote",
           "source": "digital|ocr"
@@ -186,6 +194,7 @@ Consumes the structured JSON, not raw text. Chunker is metadata-aware:
 | Chroma for Vector Store | Pure Python, integrates well with LangChain, no external C++ dependencies | We need robust production-grade persistent indices at high scale |
 | Tesseract for OCR in v1 | Pragmatic, well-supported Rust bindings exist | M5 accuracy benchmark shows it's insufficient |
 | Font width extraction parses CID/Type0 `/W` arrays and `/DW` fallbacks | Replaces the hardcoded generic 0.5 em fallback which caused incorrect bboxes for CJK text. Validated via `XeLaTeX.pdf` fixture where CJK glyphs accurately fall back to `DW=1000`. | Complex CMap encoding (beyond Identity-H/V) is encountered |
+| Same-line text merging with style span tracking | Text fragments sharing the same baseline (with dynamic tolerance based on font size) are merged to fix mid-word and label:value splits. Styling (e.g. bold font detection) is preserved as character-index `spans` within the block. | Profiling shows span tracking adds measurable overhead, or very complex layouts defeat the Y/X tolerance heuristics |
 
 ---
 

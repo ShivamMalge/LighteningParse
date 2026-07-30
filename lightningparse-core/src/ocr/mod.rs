@@ -98,6 +98,7 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
             
             current_block = Some(Block::Text {
                 text: text.to_string(),
+                spans: Vec::new(),
                 bbox: [
                     row.left as f64,
                     row.top as f64,

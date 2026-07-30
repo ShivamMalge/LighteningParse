@@ -12,7 +12,7 @@ use lopdf::{Document, Object, ObjectId};
 use rayon::prelude::*;
 
 use crate::errors::ParseError;
-use crate::output::{Block, Page};
+use crate::output::{Block, Page, Span};
 
 // ── Public API ──────────────────────────────────────────────────
 
@@ -74,13 +74,46 @@ fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<Page
     let mut raw_blocks = Vec::new();
     process_operations(doc, &content.operations, &font_map, xobjs_dict, IDENTITY, 0, &mut raw_blocks);
 
-    let blocks: Vec<Block> = raw_blocks
+    let mut merged_raw_blocks: Vec<RawBlock> = Vec::new();
+    for b in raw_blocks {
+        if b.text.trim().is_empty() { continue; }
+        
+        // Use a relative tolerance based on font size (e.g. 12pt font -> 2.4pt tol_y, 3.6pt tol_x)
+        let fs = if b.base_font_size > 0.0 { b.base_font_size.abs() } else { 12.0 };
+        let tol_y = fs * 0.2;
+        let tol_x = fs * 0.3;
+        
+        if let Some(last) = merged_raw_blocks.last_mut() {
+            let same_baseline = (b.min_y - last.min_y).abs() <= tol_y;
+            let gap_x = b.min_x - last.max_x;
+            
+            if same_baseline && gap_x >= -tol_x && gap_x <= tol_x {
+                // Merge b into last
+                let text_len_before = last.text.chars().count();
+                last.text.push_str(&b.text);
+                last.max_x = last.max_x.max(b.max_x);
+                last.min_y = last.min_y.min(b.min_y);
+                last.max_y = last.max_y.max(b.max_y);
+                
+                for mut span in b.spans {
+                    span.start += text_len_before;
+                    span.end += text_len_before;
+                    last.spans.push(span);
+                }
+                continue;
+            }
+        }
+        
+        merged_raw_blocks.push(b);
+    }
+
+    let blocks: Vec<Block> = merged_raw_blocks
         .into_iter()
-        .filter(|b| !b.text.trim().is_empty())
         .map(|b| {
             let (min_x, min_y, max_x, max_y) = b.finalise_bbox();
             Block::Text {
                 text: b.text,
+                spans: b.spans,
                 bbox: [min_x, min_y, max_x, max_y],
                 section_id: "body".into(), // Phase 1: everything is "body"
                 source: "digital".into(),
@@ -113,6 +146,7 @@ struct FontInfo {
     cid_default_width: f64,
     cid_widths: HashMap<u16, f64>,
     _identity_encoding: bool,
+    is_bold: bool,
 }
 
 type FontMap = HashMap<Vec<u8>, FontInfo>;
@@ -153,11 +187,11 @@ fn build_font_map_from_resources(doc: &Document, resources: Option<&lopdf::Dicti
 fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
     let resolved = match resolve(doc, font_obj) {
         Ok(o) => o,
-        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None, is_cid: false, cid_default_width: 1000.0, cid_widths: HashMap::new(), _identity_encoding: false },
+        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None, is_cid: false, cid_default_width: 1000.0, cid_widths: HashMap::new(), _identity_encoding: false, is_bold: false },
     };
     let font_dict = match resolved.as_dict() {
         Ok(d) => d,
-        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None, is_cid: false, cid_default_width: 1000.0, cid_widths: HashMap::new(), _identity_encoding: false },
+        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None, is_cid: false, cid_default_width: 1000.0, cid_widths: HashMap::new(), _identity_encoding: false, is_bold: false },
     };
 
     let decoder = build_font_decoder_from_dict(doc, font_dict);
@@ -235,7 +269,40 @@ fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
         }
     }
 
-    FontInfo { decoder, first_char, widths, is_cid, cid_default_width, cid_widths, _identity_encoding }
+    // Helper closure to check font dict for bold indicators
+    let check_dict_for_bold = |dict: &lopdf::Dictionary, mut is_bold: bool| -> bool {
+        if let Some(desc) = dict.get(b"FontDescriptor").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_dict().ok()) {
+            if let Some(weight) = desc.get(b"FontWeight").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_i64().ok()) {
+                if weight > 500 { is_bold = true; }
+            }
+            if !is_bold {
+                if let Some(flags) = desc.get(b"Flags").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_i64().ok()) {
+                    if (flags & 262144) != 0 { is_bold = true; } // Bit 18: ForceBold
+                }
+            }
+        }
+        if !is_bold {
+            if let Some(base_font) = dict.get(b"BaseFont").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_name().ok()) {
+                let name = String::from_utf8_lossy(base_font).to_lowercase();
+                if name.contains("bold") || name.contains("black") || name.contains("heavy") || name.contains("medium") || name.contains("semibold") {
+                    is_bold = true;
+                }
+            }
+        }
+        is_bold
+    };
+    
+    let mut is_bold = check_dict_for_bold(font_dict, false);
+    
+    if is_cid && !is_bold {
+        if let Some(descendants) = font_dict.get(b"DescendantFonts").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_array().ok()) {
+            if let Some(first_descendant) = descendants.first().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_dict().ok()) {
+                is_bold = check_dict_for_bold(first_descendant, is_bold);
+            }
+        }
+    }
+
+    FontInfo { decoder, first_char, widths, is_cid, cid_default_width, cid_widths, _identity_encoding, is_bold }
 }
 
 /// Determine the best decoder for a single font dictionary.
@@ -485,6 +552,8 @@ pub struct RawBlock {
     pub min_y: f64,
     pub max_x: f64,
     pub max_y: f64,
+    pub spans: Vec<Span>,
+    pub base_font_size: f64,
 }
 
 impl RawBlock {
@@ -495,6 +564,8 @@ impl RawBlock {
             min_y: f64::MAX,
             max_x: f64::MIN,
             max_y: f64::MIN,
+            spans: Vec::new(),
+            base_font_size: 0.0,
         }
     }
 
@@ -603,7 +674,8 @@ fn process_operations(
 
             // ── text object ──
             "BT" => {
-                ts = TextState::default();
+                ts.tm = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+                ts.lm = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
                 current = Some(RawBlock::new());
             }
             "ET" => {
@@ -797,6 +869,7 @@ fn show_string(
 ) {
     let info = font_map.get(&ts.font_name);
     let decoder = info.map(|i| &i.decoder).unwrap_or(&FontDecoder::Fallback);
+    let is_bold_font = info.map(|i| i.is_bold).unwrap_or(false);
     let decoded = decode_text(bytes, decoder);
     let width = calculate_string_width(bytes, info, ts.font_size, ts.h_scaling);
     let advance = width / (ts.h_scaling / 100.0);
@@ -814,7 +887,22 @@ fn show_string(
     let max_y = c1.1.max(c2.1).max(c3.1).max(c4.1);
 
     blk.update_bounds(min_x, min_y, max_x - min_x, max_y - min_y);
+    if blk.base_font_size == 0.0 {
+        blk.base_font_size = ts.font_size;
+    }
+    
+    let start_idx = blk.text.chars().count();
     blk.text.push_str(&decoded);
+    let end_idx = blk.text.chars().count();
+    
+    if start_idx != end_idx {
+        blk.spans.push(Span {
+            start: start_idx,
+            end: end_idx,
+            bold: is_bold_font,
+            font_size: ts.font_size,
+        });
+    }
 
     // Advance the text position along the unscaled text vector
     ts.tm[4] += advance * ts.tm[0];
@@ -831,6 +919,7 @@ fn show_tj_array(
 ) {
     let info = font_map.get(&ts.font_name);
     let decoder = info.map(|i| &i.decoder).unwrap_or(&FontDecoder::Fallback);
+    let is_bold_font = info.map(|i| i.is_bold).unwrap_or(false);
 
     for item in arr {
         if let Some(bytes) = string_bytes(item) {
@@ -851,7 +940,22 @@ fn show_tj_array(
             let max_y = c1.1.max(c2.1).max(c3.1).max(c4.1);
 
             blk.update_bounds(min_x, min_y, max_x - min_x, max_y - min_y);
+            if blk.base_font_size == 0.0 {
+                blk.base_font_size = ts.font_size;
+            }
+            
+            let start_idx = blk.text.chars().count();
             blk.text.push_str(&decoded);
+            let end_idx = blk.text.chars().count();
+            
+            if start_idx != end_idx {
+                blk.spans.push(Span {
+                    start: start_idx,
+                    end: end_idx,
+                    bold: is_bold_font,
+                    font_size: ts.font_size,
+                });
+            }
 
             ts.tm[4] += advance * ts.tm[0];
             ts.tm[5] += advance * ts.tm[1];

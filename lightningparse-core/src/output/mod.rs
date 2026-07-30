@@ -16,12 +16,23 @@ pub struct Page {
     pub blocks: Vec<Block>,
 }
 
+/// A style span within a text block.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+    pub bold: bool,
+    pub font_size: f64,
+}
+
 /// A single text block extracted from a page.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Block {
     Text {
         text: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        spans: Vec<Span>,
         bbox: [f64; 4],
         section_id: String,
         source: String,

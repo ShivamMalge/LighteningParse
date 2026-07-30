@@ -40,8 +40,8 @@ fn test_real_canva_pdf_form_xobject_extraction() {
     // It should now correctly extract text since Form XObject `Do` tracking is implemented.
     let total_blocks: usize = result.pages.iter().map(|p| p.blocks.len()).sum();
     assert_eq!(
-        total_blocks, 67,
-        "Canva PDF should produce 67 blocks from digital extraction inside Form XObjects"
+        total_blocks, 48,
+        "Canva PDF should produce 48 blocks from digital extraction inside Form XObjects"
     );
 }
 
@@ -207,3 +207,27 @@ fn test_mixed_document_routing() {
     assert!(ocr_count > 0, "Expected OCR blocks, found none");
 }
 
+#[test]
+fn test_bold_label_value_spans() {
+    let path = read_corpus_file("bold_label_value.pdf");
+    let result = lightningparse::parse_pdf_to_result(&path).expect("Should parse bold_label_value.pdf");
+    
+    let mut found_target = false;
+    for page in result.pages {
+        for block in page.blocks {
+            if let lightningparse::output::Block::Text { text, spans, .. } = block {
+                if text.starts_with("Frontend:") {
+                    assert_eq!(spans.len(), 2, "Should have exactly 2 spans after merging");
+                    assert!(spans[0].bold, "First span (Frontend:) should be bold");
+                    assert!(!spans[1].bold, "Second span (Next.js...) should not be bold");
+                    assert_eq!(spans[0].start, 0);
+                    assert_eq!(spans[0].end, 10); // "Frontend: " is 10 chars
+                    assert_eq!(spans[1].start, 10);
+                    assert_eq!(spans[1].end, 36); // "Next.js, React, TypeScript" is 26 chars (10+26=36)
+                    found_target = true;
+                }
+            }
+        }
+    }
+    assert!(found_target, "Did not find the target merged text block");
+}
