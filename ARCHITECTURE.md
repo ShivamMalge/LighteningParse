@@ -195,6 +195,7 @@ Consumes the structured JSON, not raw text. Chunker is metadata-aware:
 | Tesseract for OCR in v1 | Pragmatic, well-supported Rust bindings exist | M5 accuracy benchmark shows it's insufficient |
 | Font width extraction parses CID/Type0 `/W` arrays and `/DW` fallbacks | Replaces the hardcoded generic 0.5 em fallback which caused incorrect bboxes for CJK text. Validated via `XeLaTeX.pdf` fixture where CJK glyphs accurately fall back to `DW=1000`. | Complex CMap encoding (beyond Identity-H/V) is encountered |
 | Same-line text merging with style span tracking | Text fragments sharing the same baseline (with dynamic tolerance based on font size) are merged to fix mid-word and label:value splits. Styling (e.g. bold font detection) is preserved as character-index `spans` within the block. | Profiling shows span tracking adds measurable overhead, or very complex layouts defeat the Y/X tolerance heuristics |
+| Heading detection 70-character limit | Prevents large non-heading blocks (e.g. copyright notices) from being misclassified. The longest observed genuine heading across test fixtures is 63 characters (leaving a 7-character margin). | A future document contains a genuine heading longer than 70 characters. (This is a known sensitivity, not a bug) |
 
 ---
 
