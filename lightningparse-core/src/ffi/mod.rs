@@ -45,6 +45,7 @@ fn parse_pdf(py: Python<'_>, path: String) -> PyResult<String> {
         result.pages = cleanup::table_detect::detect_tables(result.pages)?;
         result.pages = cleanup::reconstruct_reading_order(result.pages)?;
         result.pages = cleanup::detect_headers_footers(result.pages)?;
+        result.pages = cleanup::heading_detect::detect_headings(result.pages)?;
         serde_json::to_string(&result)
             .map_err(|e| ParseError::Internal(format!("JSON serialization failed: {e}")))
     })?;

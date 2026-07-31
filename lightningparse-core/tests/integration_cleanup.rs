@@ -49,6 +49,93 @@ fn test_header_footer_detection_ieee_placeholder() {
 }
 
 #[test]
+fn test_heading_detection_false_positives() {
+    use lightningparse::output::{Block, Page, Span};
+    // Create a mock page with blocks
+    // 1. Regular body text (sets the baseline size)
+    // 2. Bold label:value line (should NOT be a heading because size == body size)
+    // 3. ALL CAPS text at body size (should NOT be a heading)
+    // 4. Genuine heading (size 1.2x body)
+    // 5. Genuine heading (size 1.05x body + fully bold)
+    
+    let mut blocks = vec![];
+    for i in 0..10 {
+        blocks.push(Block::Text {
+            text: format!("This is regular body text line {i}"),
+            spans: vec![Span { start: 0, end: 30, bold: false, font_size: 10.0 }],
+            bbox: [0.0, 0.0, 100.0, 10.0],
+            section_id: "body".into(),
+            block_role: None,
+            source: "digital".into(),
+        });
+    }
+    
+    // Bold label:value line
+    blocks.push(Block::Text {
+        text: "Frontend: Next.js, React".into(),
+        spans: vec![
+            Span { start: 0, end: 10, bold: true, font_size: 10.0 },
+            Span { start: 10, end: 24, bold: false, font_size: 10.0 }
+        ],
+        bbox: [0.0, 0.0, 100.0, 10.0],
+        section_id: "body".into(),
+        block_role: None,
+        source: "digital".into(),
+    });
+
+    // ALL CAPS text at body size
+    blocks.push(Block::Text {
+        text: "SOME ACRONYM IN BODY".into(),
+        spans: vec![Span { start: 0, end: 20, bold: false, font_size: 10.0 }],
+        bbox: [0.0, 0.0, 100.0, 10.0],
+        section_id: "body".into(),
+        block_role: None,
+        source: "digital".into(),
+    });
+
+    // Genuine heading (size 1.2x)
+    blocks.push(Block::Text {
+        text: "Introduction".into(),
+        spans: vec![Span { start: 0, end: 12, bold: false, font_size: 12.0 }],
+        bbox: [0.0, 0.0, 100.0, 10.0],
+        section_id: "body".into(),
+        block_role: None,
+        source: "digital".into(),
+    });
+
+    // Genuine heading (size 1.1x + bold)
+    blocks.push(Block::Text {
+        text: "Methodology".into(),
+        spans: vec![Span { start: 0, end: 11, bold: true, font_size: 11.0 }],
+        bbox: [0.0, 0.0, 100.0, 10.0],
+        section_id: "body".into(),
+        block_role: None,
+        source: "digital".into(),
+    });
+
+    let pages = vec![Page { page_num: 1, blocks }];
+    
+    let processed = lightningparse::cleanup::heading_detect::detect_headings(pages).unwrap();
+    let proc_blocks = &processed[0].blocks;
+    
+    if let Block::Text { block_role, .. } = &proc_blocks[10] {
+        assert_eq!(*block_role, None, "Bold label:value should NOT be a heading");
+    }
+    
+    if let Block::Text { block_role, .. } = &proc_blocks[11] {
+        assert_eq!(*block_role, None, "ALL CAPS text at body size should NOT be a heading");
+    }
+
+    if let Block::Text { block_role, .. } = &proc_blocks[12] {
+        assert_eq!(*block_role, Some("heading".into()), "Larger font size should be a heading");
+    }
+
+    if let Block::Text { block_role, .. } = &proc_blocks[13] {
+        assert_eq!(*block_role, Some("heading".into()), "Slightly larger font size + bold should be a heading");
+    }
+}
+
+#[test]
 fn test_reading_order_arxiv_twocolumn() {
     let path = read_corpus_file("arxiv_twocolumn.pdf");
     

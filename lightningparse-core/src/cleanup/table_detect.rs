@@ -178,6 +178,7 @@ pub fn detect_tables(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseError> {
                     rows: table_rows,
                     bbox: [min_x, min_y, max_x, max_y],
                     section_id: "body".to_string(), // Reading order or header detection can modify this later
+                    block_role: None,
                     source,
                 });
                 

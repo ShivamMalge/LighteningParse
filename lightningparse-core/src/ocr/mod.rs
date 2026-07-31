@@ -106,6 +106,7 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
                     (row.top + row.height) as f64,
                 ],
                 section_id: "body".to_string(),
+                block_role: None,
                 source: "ocr".to_string(),
             });
         } else if let Some(ref mut cb) = current_block {

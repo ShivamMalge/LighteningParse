@@ -35,12 +35,16 @@ pub enum Block {
         spans: Vec<Span>,
         bbox: [f64; 4],
         section_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        block_role: Option<String>,
         source: String,
     },
     Table {
         rows: Vec<Vec<String>>,
         bbox: [f64; 4],
         section_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        block_role: Option<String>,
         source: String,
     },
 }

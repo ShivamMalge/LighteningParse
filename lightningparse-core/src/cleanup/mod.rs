@@ -9,6 +9,7 @@
 //! within each swath based on x-span overlap, and sorts columns left-to-right.
 
 pub mod table_detect;
+pub mod heading_detect;
 
 use std::collections::{HashMap, HashSet};
 

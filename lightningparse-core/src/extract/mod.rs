@@ -116,6 +116,7 @@ fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<Page
                 spans: coalesce_spans(b.spans),
                 bbox: [min_x, min_y, max_x, max_y],
                 section_id: "body".into(), // Phase 1: everything is "body"
+                block_role: None,
                 source: "digital".into(),
             }
         })
