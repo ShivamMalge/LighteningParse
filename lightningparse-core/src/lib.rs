@@ -21,8 +21,10 @@ pub fn parse_pdf_to_result(path: &str) -> Result<ParseResult, ParseError> {
     let mut pages = Vec::new();
     let mut total_digital_pages = 0;
     let mut total_scanned_pages = 0;
+    let mut all_warnings = Vec::new();
 
-    for (page_num, mut blocks, total_chars) in extract_results {
+    for (page_num, mut blocks, total_chars, mut warnings) in extract_results {
+        all_warnings.append(&mut warnings);
         if total_chars == 0 {
             // OCR fallback
             let ocr_blocks = ocr::extract_page_ocr(path, page_num)?;
@@ -58,6 +60,7 @@ pub fn parse_pdf_to_result(path: &str) -> Result<ParseResult, ParseError> {
             tier: tier.to_string(),
             page_count,
             parse_time_ms,
+            warnings: all_warnings,
         },
     })
 }

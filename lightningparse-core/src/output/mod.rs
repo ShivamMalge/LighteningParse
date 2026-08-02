@@ -117,4 +117,6 @@ pub struct DocumentMetadata {
     pub tier: String,
     pub page_count: u32,
     pub parse_time_ms: u64,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
 }

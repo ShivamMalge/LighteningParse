@@ -104,9 +104,7 @@ pub fn detect_headings(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseError> {
                 }
                 
                 // Core heuristic
-                if block_size >= body_font_size * strong_ratio {
-                    *block_role = Some("heading".into());
-                } else if block_size > body_font_size * weak_ratio && fully_bold {
+                if block_size >= body_font_size * strong_ratio || (block_size > body_font_size * weak_ratio && fully_bold) {
                     *block_role = Some("heading".into());
                 }
             }

@@ -23,21 +23,22 @@ use crate::output::{Block, Page, Span};
 /// to guarantee deterministic document-order output.
 /// All pages are treated as Tier 1 (digital-native). Header/footer tagging
 /// and OCR fallback are not wired up yet (Phase 4 / Phase 5).
-pub fn extract_text(doc: &Document) -> Result<Vec<(u32, Vec<Block>, usize)>, ParseError> {
+#[allow(clippy::type_complexity)]
+pub fn extract_text(doc: &Document) -> Result<Vec<(u32, Vec<Block>, usize, Vec<String>)>, ParseError> {
     let pages_map = doc.get_pages(); // BTreeMap<u32, ObjectId>
 
     // Collect entries so rayon can partition them across threads.
     let entries: Vec<(u32, ObjectId)> = pages_map.iter().map(|(&n, &id)| (n, id)).collect();
 
     // Extract pages in parallel; collect results and propagate first error.
-    let mut results: Vec<(u32, Vec<Block>, usize)> = entries
+    let mut results: Vec<(u32, Vec<Block>, usize, Vec<String>)> = entries
         .par_iter()
         .map(|&(page_num, page_id)| {
-            let page = extract_page(doc, page_num, page_id)?;
+            let (page, warnings) = extract_page(doc, page_num, page_id)?;
             let total_chars = page.blocks.iter().map(|b| b.text().trim().chars().count()).sum();
-            Ok((page.page_num, page.blocks, total_chars))
+            Ok((page.page_num, page.blocks, total_chars, warnings))
         })
-        .collect::<Result<Vec<(u32, Vec<Block>, usize)>, ParseError>>()?;
+        .collect::<Result<Vec<(u32, Vec<Block>, usize, Vec<String>)>, ParseError>>()?;
 
     // Sort by page_num — parallel execution may reorder results.
     results.sort_by_key(|p| p.0);
@@ -47,15 +48,33 @@ pub fn extract_text(doc: &Document) -> Result<Vec<(u32, Vec<Block>, usize)>, Par
 
 // ── Per-page extraction ─────────────────────────────────────────
 
-fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<Page, ParseError> {
+fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<(Page, Vec<String>), ParseError> {
+    let mut warnings = Vec::new();
+
+    // Check for unsupported filters that cause silent failure in lopdf 0.33
+    let content_streams = doc.get_page_contents(page_id);
+    for stream_id in content_streams {
+        if let Ok(stream) = doc.get_object(stream_id).and_then(|o| o.as_stream()) {
+            if let Ok(filters) = stream.filters() {
+                for filter in filters {
+                    if filter != "FlateDecode" && filter != "LZWDecode" {
+                        let msg = format!("Page {page_num}: content stream uses unsupported filter '{filter}', falling back to OCR");
+                        eprintln!("Warning: {}", msg);
+                        warnings.push(msg);
+                    }
+                }
+            }
+        }
+    }
+
     // Get the content stream bytes (lopdf decompresses + concatenates arrays).
     let content_bytes = match doc.get_page_content(page_id) {
         Ok(data) => data,
-        Err(_) => return Ok(Page { page_num, blocks: vec![] }),
+        Err(_) => return Ok((Page { page_num, blocks: vec![] }, warnings)),
     };
 
     if content_bytes.is_empty() {
-        return Ok(Page { page_num, blocks: vec![] });
+        return Ok((Page { page_num, blocks: vec![] }, warnings));
     }
 
     let content = Content::decode(&content_bytes)
@@ -133,7 +152,7 @@ fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<Page
         })
         .collect();
 
-    Ok(Page { page_num, blocks })
+    Ok((Page { page_num, blocks }, warnings))
 }
 
 fn coalesce_spans(spans: Vec<Span>) -> Vec<Span> {
@@ -1261,8 +1280,10 @@ mod tests {
         let doc = Document::load_mem(pdf_bytes).map_err(|e| ParseError::CorruptPdf(e.to_string()))?;
         let pages_tuples = extract_text(&doc)?;
         let mut pages = Vec::new();
-        for (page_num, blocks, _) in pages_tuples {
+        let mut all_warnings = Vec::new();
+        for (page_num, blocks, _, mut warnings) in pages_tuples {
             pages.push(crate::output::Page { page_num, blocks });
+            all_warnings.append(&mut warnings);
         }
         Ok(crate::output::ParseResult {
             pages,
@@ -1270,6 +1291,7 @@ mod tests {
                 tier: "digital".to_string(),
                 page_count: doc.get_pages().len() as u32,
                 parse_time_ms: 0,
+                warnings: all_warnings,
             }
         })
     }
