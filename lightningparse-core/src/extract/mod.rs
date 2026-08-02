@@ -51,7 +51,7 @@ fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<Page
     // Get the content stream bytes (lopdf decompresses + concatenates arrays).
     let content_bytes = match doc.get_page_content(page_id) {
         Ok(data) => data,
-        Err(_) => return Ok(Page { page_num, blocks: vec![] }), // no content = blank page
+        Err(_) => return Ok(Page { page_num, blocks: vec![] }),
     };
 
     if content_bytes.is_empty() {
@@ -111,12 +111,23 @@ fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<Page
         .into_iter()
         .map(|b| {
             let (min_x, min_y, max_x, max_y) = b.finalise_bbox();
+            let spans = coalesce_spans(b.spans);
+            let mut code_covered = 0;
+            for span in &spans {
+                if span.is_monospace { code_covered += span.end - span.start; }
+            }
+            let text_len = b.text.chars().count();
+            let mut role = None;
+            if text_len > 0 && (code_covered as f64) / (text_len as f64) >= 0.9 {
+                role = Some("code".into());
+            }
+            
             Block::Text {
                 text: b.text,
-                spans: coalesce_spans(b.spans),
+                spans,
                 bbox: [min_x, min_y, max_x, max_y],
-                section_id: "body".into(), // Phase 1: everything is "body"
-                block_role: None,
+                section_id: "body".into(),
+                block_role: role,
                 source: "digital".into(),
             }
         })
@@ -129,7 +140,7 @@ fn coalesce_spans(spans: Vec<Span>) -> Vec<Span> {
     let mut coalesced: Vec<Span> = Vec::new();
     for span in spans {
         if let Some(last) = coalesced.last_mut() {
-            if last.bold == span.bold && (last.font_size - span.font_size).abs() < 0.01 {
+            if last.bold == span.bold && (last.font_size - span.font_size).abs() < 0.01 && last.is_monospace == span.is_monospace {
                 last.end = last.end.max(span.end);
                 continue;
             }
@@ -162,6 +173,7 @@ struct FontInfo {
     cid_widths: HashMap<u16, f64>,
     _identity_encoding: bool,
     is_bold: bool,
+    pub is_monospace: bool,
 }
 
 type FontMap = HashMap<Vec<u8>, FontInfo>;
@@ -202,11 +214,11 @@ fn build_font_map_from_resources(doc: &Document, resources: Option<&lopdf::Dicti
 fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
     let resolved = match resolve(doc, font_obj) {
         Ok(o) => o,
-        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None, is_cid: false, cid_default_width: 1000.0, cid_widths: HashMap::new(), _identity_encoding: false, is_bold: false },
+        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None, is_cid: false, cid_default_width: 1000.0, cid_widths: HashMap::new(), _identity_encoding: false, is_bold: false, is_monospace: false },
     };
     let font_dict = match resolved.as_dict() {
         Ok(d) => d,
-        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None, is_cid: false, cid_default_width: 1000.0, cid_widths: HashMap::new(), _identity_encoding: false, is_bold: false },
+        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None, is_cid: false, cid_default_width: 1000.0, cid_widths: HashMap::new(), _identity_encoding: false, is_bold: false, is_monospace: false },
     };
 
     let decoder = build_font_decoder_from_dict(doc, font_dict);
@@ -317,7 +329,31 @@ fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
         }
     }
 
-    FontInfo { decoder, first_char, widths, is_cid, cid_default_width, cid_widths, _identity_encoding, is_bold }
+    let mut is_monospace = false;
+    if let Some(widths) = &widths {
+        if widths.len() > 10 {
+            let mut w_map = std::collections::HashMap::new();
+            for &w in widths {
+                if w > 0.0 { *w_map.entry((w * 100.0) as i32).or_insert(0) += 1; }
+            }
+            if let Some((_, max_count)) = w_map.iter().max_by_key(|&(_, c)| c) {
+                if (*max_count as f64) / (widths.len() as f64) >= 0.9 {
+                    is_monospace = true;
+                }
+            }
+        }
+    }
+    
+    if !is_monospace {
+        if let Some(base_font) = font_dict.get(b"BaseFont").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_name().ok()) {
+            let name = String::from_utf8_lossy(base_font).to_lowercase();
+            if name.contains("courier") || name.contains("mono") || name.contains("consolas") || name.contains("menlo") || name.contains("monaco") {
+                is_monospace = true;
+            }
+        }
+    }
+
+    FontInfo { decoder, first_char, widths, is_cid, cid_default_width, cid_widths, _identity_encoding, is_bold, is_monospace }
 }
 
 /// Determine the best decoder for a single font dictionary.
@@ -916,6 +952,7 @@ fn show_string(
             end: end_idx,
             bold: is_bold_font,
             font_size: ts.font_size,
+            is_monospace: info.map(|i| i.is_monospace).unwrap_or(false),
         });
     }
 
@@ -969,6 +1006,7 @@ fn show_tj_array(
                     end: end_idx,
                     bold: is_bold_font,
                     font_size: ts.font_size,
+                    is_monospace: info.map(|i| i.is_monospace).unwrap_or(false),
                 });
             }
 

@@ -62,7 +62,7 @@ fn test_heading_detection_false_positives() {
     for i in 0..10 {
         blocks.push(Block::Text {
             text: format!("This is regular body text line {i}"),
-            spans: vec![Span { start: 0, end: 30, bold: false, font_size: 10.0 }],
+            spans: vec![Span { start: 0, end: 30, bold: false, font_size: 10.0, is_monospace: false }],
             bbox: [0.0, 0.0, 100.0, 10.0],
             section_id: "body".into(),
             block_role: None,
@@ -74,8 +74,8 @@ fn test_heading_detection_false_positives() {
     blocks.push(Block::Text {
         text: "Frontend: Next.js, React".into(),
         spans: vec![
-            Span { start: 0, end: 10, bold: true, font_size: 10.0 },
-            Span { start: 10, end: 24, bold: false, font_size: 10.0 }
+            Span { start: 0, end: 10, bold: true, font_size: 10.0, is_monospace: false },
+            Span { start: 10, end: 24, bold: false, font_size: 10.0, is_monospace: false }
         ],
         bbox: [0.0, 0.0, 100.0, 10.0],
         section_id: "body".into(),
@@ -86,7 +86,7 @@ fn test_heading_detection_false_positives() {
     // ALL CAPS text at body size
     blocks.push(Block::Text {
         text: "SOME ACRONYM IN BODY".into(),
-        spans: vec![Span { start: 0, end: 20, bold: false, font_size: 10.0 }],
+        spans: vec![Span { start: 0, end: 20, bold: false, font_size: 10.0, is_monospace: false }],
         bbox: [0.0, 0.0, 100.0, 10.0],
         section_id: "body".into(),
         block_role: None,
@@ -96,7 +96,7 @@ fn test_heading_detection_false_positives() {
     // Genuine heading (size 1.2x)
     blocks.push(Block::Text {
         text: "Introduction".into(),
-        spans: vec![Span { start: 0, end: 12, bold: false, font_size: 12.0 }],
+        spans: vec![Span { start: 0, end: 12, bold: false, font_size: 12.0, is_monospace: false }],
         bbox: [0.0, 0.0, 100.0, 10.0],
         section_id: "body".into(),
         block_role: None,
@@ -106,7 +106,7 @@ fn test_heading_detection_false_positives() {
     // Genuine heading (size 1.1x + bold)
     blocks.push(Block::Text {
         text: "Methodology".into(),
-        spans: vec![Span { start: 0, end: 11, bold: true, font_size: 11.0 }],
+        spans: vec![Span { start: 0, end: 11, bold: true, font_size: 11.0, is_monospace: false }],
         bbox: [0.0, 0.0, 100.0, 10.0],
         section_id: "body".into(),
         block_role: None,

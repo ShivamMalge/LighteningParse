@@ -23,6 +23,8 @@ pub struct Span {
     pub end: usize,
     pub bold: bool,
     pub font_size: f64,
+    #[serde(default)]
+    pub is_monospace: bool,
 }
 
 /// A single text block extracted from a page.
@@ -97,6 +99,13 @@ impl Block {
         match self {
             Block::Text { text, .. } => Some(text),
             Block::Table { .. } => None,
+        }
+    }
+
+    pub fn block_role(&self) -> Option<&str> {
+        match self {
+            Block::Text { block_role, .. } => block_role.as_deref(),
+            Block::Table { block_role, .. } => block_role.as_deref(),
         }
     }
 }

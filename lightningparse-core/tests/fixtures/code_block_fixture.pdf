@@ -1,0 +1,92 @@
+%PDF-1.3
+%“Œ‹ž ReportLab Generated PDF document (opensource)
+1 0 obj
+<<
+/F1 2 0 R /F2 3 0 R
+>>
+endobj
+2 0 obj
+<<
+/BaseFont /Helvetica /Encoding /WinAnsiEncoding /Name /F1 /Subtype /Type1 /Type /Font
+>>
+endobj
+3 0 obj
+<<
+/BaseFont /Courier /Encoding /WinAnsiEncoding /Name /F2 /Subtype /Type1 /Type /Font
+>>
+endobj
+4 0 obj
+<<
+/Contents 8 0 R /MediaBox [ 0 0 612 792 ] /Parent 7 0 R /Resources <<
+/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
+>> /Rotate 0 /Trans <<
+
+>> 
+  /Type /Page
+>>
+endobj
+5 0 obj
+<<
+/PageMode /UseNone /Pages 7 0 R /Type /Catalog
+>>
+endobj
+6 0 obj
+<<
+/Author (anonymous) /CreationDate (D:20260802105307+05'00') /Creator (anonymous) /Keywords () /ModDate (D:20260802105307+05'00') /Producer (ReportLab PDF Library - \(opensource\)) 
+  /Subject (unspecified) /Title (untitled) /Trapped /False
+>>
+endobj
+7 0 obj
+<<
+/Count 1 /Kids [ 4 0 R ] /Type /Pages
+>>
+endobj
+8 0 obj
+<<
+/Length 847
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F1 12 Tf 14.4 TL ET
+BT 1 0 0 1 72 700 Tm (This is a regular paragraph of body text.) Tj T* ET
+BT 1 0 0 1 72 680 Tm (It precedes a code block to ensure we detect the transition.) Tj T* ET
+BT 1 0 0 1 72 660 Tm (We can also call ) Tj T* ET
+BT /F2 12 Tf 14.4 TL ET
+BT 1 0 0 1 160 660 Tm (parse\(\)) Tj T* ET
+BT /F1 12 Tf 14.4 TL ET
+BT 1 0 0 1 210 660 Tm ( inline.) Tj T* ET
+BT /F2 10 Tf 12 TL ET
+BT 1 0 0 1 72 620 Tm (def fibonacci\(n\):) Tj T* ET
+BT 1 0 0 1 72 608 Tm (    if n <= 1:) Tj T* ET
+BT 1 0 0 1 72 596 Tm (        return n) Tj T* ET
+BT 1 0 0 1 72 584 Tm (    return fibonacci\(n-1\) + fibonacci\(n-2\)) Tj T* ET
+BT /F1 12 Tf 14.4 TL ET
+BT 1 0 0 1 72 552 Tm (This is a second paragraph of body text.) Tj T* ET
+BT 1 0 0 1 72 532 Tm (It confirms the code block detection ends correctly.) Tj T* ET
+ 
+endstream
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000061 00000 n 
+0000000102 00000 n 
+0000000209 00000 n 
+0000000314 00000 n 
+0000000507 00000 n 
+0000000575 00000 n 
+0000000836 00000 n 
+0000000895 00000 n 
+trailer
+<<
+/ID 
+[<445a8d245154d8df7a9496d0f897a279><445a8d245154d8df7a9496d0f897a279>]
+% ReportLab generated PDF document -- digest (opensource)
+
+/Info 6 0 R
+/Root 5 0 R
+/Size 9
+>>
+startxref
+1792
+%%EOF
