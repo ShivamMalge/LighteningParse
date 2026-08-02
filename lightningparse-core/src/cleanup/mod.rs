@@ -8,8 +8,8 @@
 //! separated by full-width blocks, then clusters blocks into columns
 //! within each swath based on x-span overlap, and sorts columns left-to-right.
 
-pub mod table_detect;
 pub mod heading_detect;
+pub mod table_detect;
 
 use std::collections::{HashMap, HashSet};
 
@@ -123,11 +123,12 @@ pub fn detect_headers_footers(mut pages: Vec<Page>) -> Result<Vec<Page>, ParseEr
             // Single-page fallbacks (only apply to the first page to avoid mistagging top-of-page figures/tables on subsequent pages)
             if page.page_num == 1 {
                 // Check footnote first (up to bottom 30%)
-                if block.bbox()[1] < page_bottom_30 && (block.text().starts_with('*') 
-                    || block.text().starts_with('\u{2217}') 
-                    || block.text().starts_with('†') 
-                    || block.text().starts_with('‡') 
-                    || block.text().starts_with('§')) 
+                if block.bbox()[1] < page_bottom_30
+                    && (block.text().starts_with('*')
+                        || block.text().starts_with('\u{2217}')
+                        || block.text().starts_with('†')
+                        || block.text().starts_with('‡')
+                        || block.text().starts_with('§'))
                 {
                     block.set_section_id("footnote".into());
                     continue;
@@ -236,7 +237,7 @@ pub fn reconstruct_reading_order(mut pages: Vec<Page>) -> Result<Vec<Page>, Pars
         if !current_swath.is_empty() {
             swaths.push(current_swath);
         }
-        
+
         // Clear page.blocks since we cloned them out (to avoid borrow checker issues with drain + iter).
         page.blocks.clear();
 
@@ -296,7 +297,8 @@ pub fn reconstruct_reading_order(mut pages: Vec<Page>) -> Result<Vec<Page>, Pars
             let mut col_list: Vec<(f64, Vec<Block>)> = columns
                 .into_values()
                 .map(|mut col_blocks| {
-                    let avg_x = col_blocks.iter().map(|b| b.bbox()[0]).sum::<f64>() / (col_blocks.len() as f64);
+                    let avg_x = col_blocks.iter().map(|b| b.bbox()[0]).sum::<f64>()
+                        / (col_blocks.len() as f64);
                     // Sort blocks within column top-to-bottom.
                     col_blocks.sort_by(|a, b| {
                         b.bbox()[3]
@@ -313,7 +315,9 @@ pub fn reconstruct_reading_order(mut pages: Vec<Page>) -> Result<Vec<Page>, Pars
                 .collect();
 
             // Sort columns left-to-right.
-            col_list.sort_by(|(x1, _), (x2, _)| x1.partial_cmp(x2).unwrap_or(std::cmp::Ordering::Equal));
+            col_list.sort_by(|(x1, _), (x2, _)| {
+                x1.partial_cmp(x2).unwrap_or(std::cmp::Ordering::Equal)
+            });
 
             // Append blocks in reading order.
             for (_, col_blocks) in col_list {

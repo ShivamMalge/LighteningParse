@@ -83,10 +83,7 @@ fn test_real_latex_pdf_has_text() {
     let result = lightningparse::parse_pdf_to_result(&path).unwrap();
 
     let total_blocks: usize = result.pages.iter().map(|p| p.blocks.len()).sum();
-    assert!(
-        total_blocks > 0,
-        "LaTeX PDF should produce text blocks"
-    );
+    assert!(total_blocks > 0, "LaTeX PDF should produce text blocks");
 
     // Spot-check: combined text should be substantial.
     let all_text: String = result
@@ -140,17 +137,10 @@ fn test_parallel_determinism() {
     for i in 0..5 {
         let r = lightningparse::parse_pdf_to_result(&path).unwrap();
 
-        assert_eq!(
-            first.pages.len(),
-            r.pages.len(),
-            "run count differs",
-        );
+        assert_eq!(first.pages.len(), r.pages.len(), "run count differs",);
 
         for (p1, p2) in first.pages.iter().zip(r.pages.iter()) {
-            assert_eq!(
-                p1.page_num, p2.page_num,
-                "run {i}: page_num mismatch",
-            );
+            assert_eq!(p1.page_num, p2.page_num, "run {i}: page_num mismatch",);
             assert_eq!(
                 p1.blocks.len(),
                 p2.blocks.len(),
@@ -159,12 +149,14 @@ fn test_parallel_determinism() {
             );
             for (b1, b2) in p1.blocks.iter().zip(p2.blocks.iter()) {
                 assert_eq!(
-                    b1.text(), b2.text(),
+                    b1.text(),
+                    b2.text(),
                     "run {i}: text differs on page {}",
                     p1.page_num,
                 );
                 assert_eq!(
-                    b1.bbox(), b2.bbox(),
+                    b1.bbox(),
+                    b2.bbox(),
                     "run {i}: bbox differs on page {}",
                     p1.page_num,
                 );
@@ -202,7 +194,7 @@ fn test_mixed_document_routing() {
             }
         }
     }
-    
+
     assert!(digital_count > 0, "Expected digital blocks, found none");
     assert!(ocr_count > 0, "Expected OCR blocks, found none");
 }
@@ -210,8 +202,9 @@ fn test_mixed_document_routing() {
 #[test]
 fn test_bold_label_value_spans() {
     let path = read_corpus_file("bold_label_value.pdf");
-    let result = lightningparse::parse_pdf_to_result(&path).expect("Should parse bold_label_value.pdf");
-    
+    let result =
+        lightningparse::parse_pdf_to_result(&path).expect("Should parse bold_label_value.pdf");
+
     let mut found_target = false;
     for page in result.pages {
         for block in page.blocks {
@@ -219,7 +212,10 @@ fn test_bold_label_value_spans() {
                 if text.starts_with("Frontend:") {
                     assert_eq!(spans.len(), 2, "Should have exactly 2 spans after merging");
                     assert!(spans[0].bold, "First span (Frontend:) should be bold");
-                    assert!(!spans[1].bold, "Second span (Next.js...) should not be bold");
+                    assert!(
+                        !spans[1].bold,
+                        "Second span (Next.js...) should not be bold"
+                    );
                     assert_eq!(spans[0].start, 0);
                     assert_eq!(spans[0].end, 10); // "Frontend: " is 10 chars
                     assert_eq!(spans[1].start, 10);
@@ -240,13 +236,11 @@ fn test_code_block_detection() {
     path.push("code_block_fixture.pdf");
     let doc = lightningparse::parse_pdf_to_result(path.to_str().unwrap()).unwrap();
     let blocks = &doc.pages[0].blocks;
-    
+
     // "This is a regular paragraph of body text." -> None
     assert_eq!(blocks[0].block_role(), None);
-    // "parse()" -> code
-    assert_eq!(blocks[3].block_role(), Some("code"));
-    // " inline." -> None
-    assert_eq!(blocks[4].block_role(), None);
+    // "We can also call parse() inline." -> None (it's inline, not a structural code block)
+    assert_eq!(blocks[2].block_role(), None);
     // "def fibonacci(n):" -> code
-    assert_eq!(blocks[5].block_role(), Some("code"));
+    assert_eq!(blocks[3].block_role(), Some("code"));
 }

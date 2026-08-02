@@ -1,11 +1,12 @@
 use crate::errors::ParseError;
 use crate::output::Block;
-use std::process::Command;
 use rusty_tesseract::{Args, Image};
+use std::process::Command;
 
 pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, ParseError> {
     // We shell out to pdftoppm to render exactly the target page to a temp file
-    let temp_dir = tempfile::tempdir().map_err(|e| ParseError::OcrFailed(format!("Failed to create tempdir: {}", e)))?;
+    let temp_dir = tempfile::tempdir()
+        .map_err(|e| ParseError::OcrFailed(format!("Failed to create tempdir: {}", e)))?;
     let output_prefix = temp_dir.path().join("page");
 
     // Execute pdftoppm
@@ -23,11 +24,21 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
 
     match status {
         Ok(s) if s.success() => {}
-        Ok(s) => return Err(ParseError::OcrFailed(format!("pdftoppm failed with status: {}", s))),
+        Ok(s) => {
+            return Err(ParseError::OcrFailed(format!(
+                "pdftoppm failed with status: {}",
+                s
+            )))
+        }
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             return Err(ParseError::OcrMissingDependency("pdftoppm".to_string()));
         }
-        Err(e) => return Err(ParseError::OcrFailed(format!("Failed to execute pdftoppm: {}", e))),
+        Err(e) => {
+            return Err(ParseError::OcrFailed(format!(
+                "Failed to execute pdftoppm: {}",
+                e
+            )))
+        }
     }
 
     // pdftoppm produces files like page-1.png or page-001.png or page-01.png
@@ -41,24 +52,24 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
         }
     }
 
-    let image_path = image_path.ok_or_else(|| ParseError::OcrFailed("pdftoppm did not produce a PNG file".to_string()))?;
+    let image_path = image_path
+        .ok_or_else(|| ParseError::OcrFailed("pdftoppm did not produce a PNG file".to_string()))?;
 
     let img = Image::from_path(image_path.to_string_lossy().as_ref())
         .map_err(|e| ParseError::OcrFailed(format!("Failed to load image for tesseract: {}", e)))?;
-    
+
     let args = Args {
         lang: "eng".to_string(),
         ..Default::default()
     };
 
-    let tsv_output = rusty_tesseract::image_to_data(&img, &args)
-        .map_err(|e| {
-            if let rusty_tesseract::TessError::TesseractNotFoundError = e {
-                ParseError::OcrMissingDependency("tesseract".to_string())
-            } else {
-                ParseError::OcrFailed(format!("Tesseract failed: {:?}", e))
-            }
-        })?;
+    let tsv_output = rusty_tesseract::image_to_data(&img, &args).map_err(|e| {
+        if let rusty_tesseract::TessError::TesseractNotFoundError = e {
+            ParseError::OcrMissingDependency("tesseract".to_string())
+        } else {
+            ParseError::OcrFailed(format!("Tesseract failed: {:?}", e))
+        }
+    })?;
 
     // Group the words by block_num / par_num
     let mut blocks: Vec<Block> = Vec::new();
@@ -71,7 +82,7 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
         if row.level != 5 {
             continue;
         }
-        
+
         // Skip empty text (tesseract sometimes outputs empty words)
         let text = row.text.trim();
         if text.is_empty() {
@@ -95,7 +106,7 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
             }
             current_block_id = block_id;
             current_line_id = line_id;
-            
+
             current_block = Some(Block::Text {
                 text: text.to_string(),
                 spans: Vec::new(),
@@ -133,8 +144,12 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
 
     // We need to invert the Y-axis to match PDF space (where y=0 is at the bottom).
     // We also scale from 300 DPI to 72 DPI. (72.0 / 300.0 = 0.24)
-    let img_reader = image::io::Reader::open(&image_path).map_err(|e| ParseError::OcrFailed(format!("Failed to open image for dimensions: {}", e)))?;
-    let img_dimensions = img_reader.into_dimensions().map_err(|e| ParseError::OcrFailed(format!("Failed to decode image dimensions: {}", e)))?;
+    let img_reader = image::io::Reader::open(&image_path).map_err(|e| {
+        ParseError::OcrFailed(format!("Failed to open image for dimensions: {}", e))
+    })?;
+    let img_dimensions = img_reader
+        .into_dimensions()
+        .map_err(|e| ParseError::OcrFailed(format!("Failed to decode image dimensions: {}", e)))?;
     let page_height_pt = img_dimensions.1 as f64 * 0.24;
 
     let mut filtered_blocks = Vec::new();
@@ -147,7 +162,7 @@ pub fn extract_page_ocr(pdf_path: &str, page_num: u32) -> Result<Vec<Block>, Par
         // Invert Y-axis: new_y = page_height_pt - old_y
         let top = page_height_pt - b.bbox_mut()[1];
         let bottom = page_height_pt - b.bbox_mut()[3];
-        
+
         // Ensure bbox is [x0, y0, x1, y1] where x0 < x1 and y0 < y1
         b.bbox_mut()[1] = bottom;
         b.bbox_mut()[3] = top;

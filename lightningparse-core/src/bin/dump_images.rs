@@ -23,17 +23,28 @@ fn main() {
             let parent_dict = parent.as_dict().ok()?;
             parent_dict.get(b"Resources").ok()
         });
-        
+
         if let Some(res_obj) = res_obj_opt {
             if let Ok(res) = resolve(&doc, res_obj).and_then(|o| o.as_dict().map_err(|_| ())) {
                 if let Ok(xobj_obj) = res.get(b"XObject") {
-                    if let Ok(xobj) = resolve(&doc, xobj_obj).and_then(|o| o.as_dict().map_err(|_| ())) {
+                    if let Ok(xobj) =
+                        resolve(&doc, xobj_obj).and_then(|o| o.as_dict().map_err(|_| ()))
+                    {
                         for (name, obj) in xobj.iter() {
                             let obj_ref = obj.as_reference().unwrap();
                             let stream = doc.get_object(obj_ref).unwrap().as_stream().unwrap();
                             let dict = &stream.dict;
-                            if dict.get(b"Subtype").and_then(|o| o.as_name()).unwrap_or(b"") == b"Image" {
-                                println!("Page {} Image {:?}:", page_num, String::from_utf8_lossy(name));
+                            if dict
+                                .get(b"Subtype")
+                                .and_then(|o| o.as_name())
+                                .unwrap_or(b"")
+                                == b"Image"
+                            {
+                                println!(
+                                    "Page {} Image {:?}:",
+                                    page_num,
+                                    String::from_utf8_lossy(name)
+                                );
                                 println!("  Filter: {:?}", dict.get(b"Filter"));
                                 println!("  Width: {:?}", dict.get(b"Width"));
                                 println!("  Height: {:?}", dict.get(b"Height"));

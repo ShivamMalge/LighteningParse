@@ -1,23 +1,23 @@
 use crate::errors::ParseError;
-use crate::output::{ParseResult, DocumentMetadata, Page};
+use crate::output::{DocumentMetadata, Page, ParseResult};
 use lopdf::Document;
 
 pub mod cleanup;
 pub mod errors;
 pub mod extract;
+pub mod ffi;
 pub mod ocr;
 pub mod output;
-pub mod ffi;
 
 pub fn parse_pdf_to_result(path: &str) -> Result<ParseResult, ParseError> {
     let pdf_bytes = std::fs::read(path).map_err(ParseError::Io)?;
     let start = std::time::Instant::now();
-    
+
     let doc = Document::load_mem(&pdf_bytes)
         .map_err(|e| ParseError::CorruptPdf(format!("Failed to parse PDF: {e}")))?;
 
     let extract_results = extract::extract_text(&doc)?;
-    
+
     let mut pages = Vec::new();
     let mut total_digital_pages = 0;
     let mut total_scanned_pages = 0;
@@ -28,19 +28,16 @@ pub fn parse_pdf_to_result(path: &str) -> Result<ParseResult, ParseError> {
         if total_chars == 0 {
             // OCR fallback
             let ocr_blocks = ocr::extract_page_ocr(path, page_num)?;
-            
-            // Map ocr::extract::RawBlock to output::Block is done in cleanup step later? 
+
+            // Map ocr::extract::RawBlock to output::Block is done in cleanup step later?
             // Wait, RawBlock is what extract_text returns.
             blocks = ocr_blocks;
             total_scanned_pages += 1;
         } else {
             total_digital_pages += 1;
         }
-        
-        pages.push(Page {
-            page_num,
-            blocks,
-        });
+
+        pages.push(Page { page_num, blocks });
     }
 
     let tier = if total_digital_pages > 0 && total_scanned_pages > 0 {

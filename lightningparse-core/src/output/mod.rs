@@ -58,14 +58,14 @@ impl Block {
             Block::Table { bbox, .. } => bbox,
         }
     }
-    
+
     pub fn bbox_mut(&mut self) -> &mut [f64; 4] {
         match self {
             Block::Text { bbox, .. } => bbox,
             Block::Table { bbox, .. } => bbox,
         }
     }
-    
+
     pub fn section_id(&self) -> &str {
         match self {
             Block::Text { section_id, .. } => section_id,

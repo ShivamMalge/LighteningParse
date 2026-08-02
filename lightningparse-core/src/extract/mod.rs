@@ -6,7 +6,6 @@
 
 use std::collections::HashMap;
 
-
 use lopdf::content::{Content, Operation};
 use lopdf::{Document, Object, ObjectId};
 use rayon::prelude::*;
@@ -24,7 +23,9 @@ use crate::output::{Block, Page, Span};
 /// All pages are treated as Tier 1 (digital-native). Header/footer tagging
 /// and OCR fallback are not wired up yet (Phase 4 / Phase 5).
 #[allow(clippy::type_complexity)]
-pub fn extract_text(doc: &Document) -> Result<Vec<(u32, Vec<Block>, usize, Vec<String>)>, ParseError> {
+pub fn extract_text(
+    doc: &Document,
+) -> Result<Vec<(u32, Vec<Block>, usize, Vec<String>)>, ParseError> {
     let pages_map = doc.get_pages(); // BTreeMap<u32, ObjectId>
 
     // Collect entries so rayon can partition them across threads.
@@ -35,7 +36,11 @@ pub fn extract_text(doc: &Document) -> Result<Vec<(u32, Vec<Block>, usize, Vec<S
         .par_iter()
         .map(|&(page_num, page_id)| {
             let (page, warnings) = extract_page(doc, page_num, page_id)?;
-            let total_chars = page.blocks.iter().map(|b| b.text().trim().chars().count()).sum();
+            let total_chars = page
+                .blocks
+                .iter()
+                .map(|b| b.text().trim().chars().count())
+                .sum();
             Ok((page.page_num, page.blocks, total_chars, warnings))
         })
         .collect::<Result<Vec<(u32, Vec<Block>, usize, Vec<String>)>, ParseError>>()?;
@@ -48,7 +53,11 @@ pub fn extract_text(doc: &Document) -> Result<Vec<(u32, Vec<Block>, usize, Vec<S
 
 // ── Per-page extraction ─────────────────────────────────────────
 
-fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<(Page, Vec<String>), ParseError> {
+fn extract_page(
+    doc: &Document,
+    page_num: u32,
+    page_id: ObjectId,
+) -> Result<(Page, Vec<String>), ParseError> {
     let mut warnings = Vec::new();
 
     // Check for unsupported filters that cause silent failure in lopdf 0.33
@@ -70,18 +79,36 @@ fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<(Pag
     // Get the content stream bytes (lopdf decompresses + concatenates arrays).
     let content_bytes = match doc.get_page_content(page_id) {
         Ok(data) => data,
-        Err(_) => return Ok((Page { page_num, blocks: vec![] }, warnings)),
+        Err(_) => {
+            return Ok((
+                Page {
+                    page_num,
+                    blocks: vec![],
+                },
+                warnings,
+            ))
+        }
     };
 
     if content_bytes.is_empty() {
-        return Ok((Page { page_num, blocks: vec![] }, warnings));
+        return Ok((
+            Page {
+                page_num,
+                blocks: vec![],
+            },
+            warnings,
+        ));
     }
 
     let content = Content::decode(&content_bytes)
         .map_err(|e| ParseError::CorruptPdf(format!("Page {page_num} content stream: {e}")))?;
 
-    let page_obj = doc.get_object(page_id).map_err(|e| ParseError::CorruptPdf(e.to_string()))?;
-    let page_dict = page_obj.as_dict().map_err(|_| ParseError::CorruptPdf("Page is not a dictionary".into()))?;
+    let page_obj = doc
+        .get_object(page_id)
+        .map_err(|e| ParseError::CorruptPdf(e.to_string()))?;
+    let page_dict = page_obj
+        .as_dict()
+        .map_err(|_| ParseError::CorruptPdf("Page is not a dictionary".into()))?;
     let resources = get_resources(doc, page_dict);
 
     let font_map = build_font_map_from_resources(doc, resources);
@@ -91,29 +118,59 @@ fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<(Pag
         .and_then(|x| x.as_dict().ok());
 
     let mut raw_blocks = Vec::new();
-    process_operations(doc, &content.operations, &font_map, xobjs_dict, IDENTITY, 0, &mut raw_blocks);
+    process_operations(
+        doc,
+        &content.operations,
+        &font_map,
+        xobjs_dict,
+        IDENTITY,
+        0,
+        &mut raw_blocks,
+    );
 
     let mut merged_raw_blocks: Vec<RawBlock> = Vec::new();
     for b in raw_blocks {
-        if b.text.trim().is_empty() { continue; }
-        
+        if b.text.trim().is_empty() {
+            continue;
+        }
+
         // Use a relative tolerance based on font size (e.g. 12pt font -> 2.4pt tol_y, 3.6pt tol_x)
-        let fs = if b.base_font_size > 0.0 { b.base_font_size.abs() } else { 12.0 };
+        let fs = if b.base_font_size > 0.0 {
+            b.base_font_size.abs()
+        } else {
+            12.0
+        };
         let tol_y = fs * 0.2;
-        let tol_x = fs * 0.3;
-        
+        let mut tol_x = fs * 0.3;
+
         if let Some(last) = merged_raw_blocks.last_mut() {
             let same_baseline = (b.min_y - last.min_y).abs() <= tol_y;
+
+            if let (Some(last_span), Some(b_span)) = (last.spans.last(), b.spans.first()) {
+                let style_changed = last_span.bold != b_span.bold
+                    || last_span.is_monospace != b_span.is_monospace
+                    || (last_span.font_size - b_span.font_size).abs() > 0.1;
+                if style_changed {
+                    // Increase horizontal tolerance to account for width estimation errors
+                    // on fallback fonts when the style changes abruptly (e.g., Courier vs Helvetica).
+                    tol_x = fs * 1.5;
+                }
+            }
+
             let gap_x = b.min_x - last.max_x;
-            
-            if same_baseline && gap_x >= -tol_x && gap_x <= tol_x {
+
+            // Allow negative gap_x (overlap) caused by font fallback width overestimation,
+            // as long as the new block doesn't start before the current block (LTR order).
+            let ltr_order = b.min_x >= last.min_x - tol_x;
+
+            if same_baseline && ltr_order && gap_x <= tol_x {
                 // Merge b into last
                 let text_len_before = last.text.chars().count();
                 last.text.push_str(&b.text);
                 last.max_x = last.max_x.max(b.max_x);
                 last.min_y = last.min_y.min(b.min_y);
                 last.max_y = last.max_y.max(b.max_y);
-                
+
                 for mut span in b.spans {
                     span.start += text_len_before;
                     span.end += text_len_before;
@@ -122,7 +179,7 @@ fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<(Pag
                 continue;
             }
         }
-        
+
         merged_raw_blocks.push(b);
     }
 
@@ -133,14 +190,16 @@ fn extract_page(doc: &Document, page_num: u32, page_id: ObjectId) -> Result<(Pag
             let spans = coalesce_spans(b.spans);
             let mut code_covered = 0;
             for span in &spans {
-                if span.is_monospace { code_covered += span.end - span.start; }
+                if span.is_monospace {
+                    code_covered += span.end - span.start;
+                }
             }
             let text_len = b.text.chars().count();
             let mut role = None;
             if text_len > 0 && (code_covered as f64) / (text_len as f64) >= 0.9 {
                 role = Some("code".into());
             }
-            
+
             Block::Text {
                 text: b.text,
                 spans,
@@ -159,7 +218,10 @@ fn coalesce_spans(spans: Vec<Span>) -> Vec<Span> {
     let mut coalesced: Vec<Span> = Vec::new();
     for span in spans {
         if let Some(last) = coalesced.last_mut() {
-            if last.bold == span.bold && (last.font_size - span.font_size).abs() < 0.01 && last.is_monospace == span.is_monospace {
+            if last.bold == span.bold
+                && (last.font_size - span.font_size).abs() < 0.01
+                && last.is_monospace == span.is_monospace
+            {
                 last.end = last.end.max(span.end);
                 continue;
             }
@@ -198,16 +260,16 @@ struct FontInfo {
 type FontMap = HashMap<Vec<u8>, FontInfo>;
 
 /// Helper to extract the Resources dictionary from a page or Form XObject.
-fn get_resources<'a>(doc: &'a Document, dict: &'a lopdf::Dictionary) -> Option<&'a lopdf::Dictionary> {
-    let resources_obj = dict
-        .get(b"Resources")
-        .ok()
-        .or_else(|| {
-            let parent_ref = dict.get(b"Parent").ok()?;
-            let parent = resolve(doc, parent_ref).ok()?;
-            let parent_dict = parent.as_dict().ok()?;
-            parent_dict.get(b"Resources").ok()
-        })?;
+fn get_resources<'a>(
+    doc: &'a Document,
+    dict: &'a lopdf::Dictionary,
+) -> Option<&'a lopdf::Dictionary> {
+    let resources_obj = dict.get(b"Resources").ok().or_else(|| {
+        let parent_ref = dict.get(b"Parent").ok()?;
+        let parent = resolve(doc, parent_ref).ok()?;
+        let parent_dict = parent.as_dict().ok()?;
+        parent_dict.get(b"Resources").ok()
+    })?;
     resolve(doc, resources_obj).ok()?.as_dict().ok()
 }
 
@@ -233,21 +295,49 @@ fn build_font_map_from_resources(doc: &Document, resources: Option<&lopdf::Dicti
 fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
     let resolved = match resolve(doc, font_obj) {
         Ok(o) => o,
-        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None, is_cid: false, cid_default_width: 1000.0, cid_widths: HashMap::new(), _identity_encoding: false, is_bold: false, is_monospace: false },
+        Err(_) => {
+            return FontInfo {
+                decoder: FontDecoder::Fallback,
+                first_char: 0,
+                widths: None,
+                is_cid: false,
+                cid_default_width: 1000.0,
+                cid_widths: HashMap::new(),
+                _identity_encoding: false,
+                is_bold: false,
+                is_monospace: false,
+            }
+        }
     };
     let font_dict = match resolved.as_dict() {
         Ok(d) => d,
-        Err(_) => return FontInfo { decoder: FontDecoder::Fallback, first_char: 0, widths: None, is_cid: false, cid_default_width: 1000.0, cid_widths: HashMap::new(), _identity_encoding: false, is_bold: false, is_monospace: false },
+        Err(_) => {
+            return FontInfo {
+                decoder: FontDecoder::Fallback,
+                first_char: 0,
+                widths: None,
+                is_cid: false,
+                cid_default_width: 1000.0,
+                cid_widths: HashMap::new(),
+                _identity_encoding: false,
+                is_bold: false,
+                is_monospace: false,
+            }
+        }
     };
 
     let decoder = build_font_decoder_from_dict(doc, font_dict);
 
-    let first_char = font_dict.get(b"FirstChar").ok()
+    let first_char = font_dict
+        .get(b"FirstChar")
+        .ok()
         .and_then(|o| resolve(doc, o).ok())
         .and_then(|o| o.as_i64().ok())
         .unwrap_or(0) as u16;
 
-    let widths = font_dict.get(b"Widths").ok()
+    let widths = font_dict
+        .get(b"Widths")
+        .ok()
         .and_then(|o| resolve(doc, o).ok())
         .and_then(|o| o.as_array().ok())
         .map(|arr| {
@@ -261,7 +351,12 @@ fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
     let mut cid_widths = HashMap::new();
     let mut _identity_encoding = false;
 
-    if font_dict.get(b"Subtype").and_then(|o| o.as_name()).unwrap_or(b"") == b"Type0" {
+    if font_dict
+        .get(b"Subtype")
+        .and_then(|o| o.as_name())
+        .unwrap_or(b"")
+        == b"Type0"
+    {
         is_cid = true;
 
         if let Ok(enc) = font_dict.get(b"Encoding") {
@@ -272,19 +367,38 @@ fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
             }
         }
 
-        if let Some(descendants) = font_dict.get(b"DescendantFonts").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_array().ok()) {
-            if let Some(first_descendant) = descendants.first().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_dict().ok()) {
-                if let Some(dw) = first_descendant.get(b"DW").ok().and_then(|o| resolve(doc, o).ok()) {
+        if let Some(descendants) = font_dict
+            .get(b"DescendantFonts")
+            .ok()
+            .and_then(|o| resolve(doc, o).ok())
+            .and_then(|o| o.as_array().ok())
+        {
+            if let Some(first_descendant) = descendants
+                .first()
+                .and_then(|o| resolve(doc, o).ok())
+                .and_then(|o| o.as_dict().ok())
+            {
+                if let Some(dw) = first_descendant
+                    .get(b"DW")
+                    .ok()
+                    .and_then(|o| resolve(doc, o).ok())
+                {
                     cid_default_width = num(dw);
                 }
 
-                if let Some(w_array) = first_descendant.get(b"W").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_array().ok()) {
+                if let Some(w_array) = first_descendant
+                    .get(b"W")
+                    .ok()
+                    .and_then(|o| resolve(doc, o).ok())
+                    .and_then(|o| o.as_array().ok())
+                {
                     let mut i = 0;
                     while i < w_array.len() {
                         if let Some(c_first) = resolve(doc, &w_array[i]).ok().map(num) {
                             let cid_start = c_first as u16;
                             if i + 1 < w_array.len() {
-                                if let Ok(Object::Array(ref w_list)) = resolve(doc, &w_array[i + 1]) {
+                                if let Ok(Object::Array(ref w_list)) = resolve(doc, &w_array[i + 1])
+                                {
                                     for (j, w_val) in w_list.iter().enumerate() {
                                         if let Some(w) = resolve(doc, w_val).ok().map(num) {
                                             cid_widths.insert(cid_start + j as u16, w);
@@ -292,8 +406,11 @@ fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
                                     }
                                     i += 2;
                                 } else if i + 2 < w_array.len() {
-                                    if let Some(c_last) = resolve(doc, &w_array[i + 1]).ok().map(num) {
-                                        if let Some(w) = resolve(doc, &w_array[i + 2]).ok().map(num) {
+                                    if let Some(c_last) =
+                                        resolve(doc, &w_array[i + 1]).ok().map(num)
+                                    {
+                                        if let Some(w) = resolve(doc, &w_array[i + 2]).ok().map(num)
+                                        {
                                             for c in cid_start..=(c_last as u16) {
                                                 cid_widths.insert(c, w);
                                             }
@@ -317,32 +434,70 @@ fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
 
     // Helper closure to check font dict for bold indicators
     let check_dict_for_bold = |dict: &lopdf::Dictionary, mut is_bold: bool| -> bool {
-        if let Some(desc) = dict.get(b"FontDescriptor").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_dict().ok()) {
-            if let Some(weight) = desc.get(b"FontWeight").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_i64().ok()) {
-                if weight > 500 { is_bold = true; }
+        if let Some(desc) = dict
+            .get(b"FontDescriptor")
+            .ok()
+            .and_then(|o| resolve(doc, o).ok())
+            .and_then(|o| o.as_dict().ok())
+        {
+            if let Some(weight) = desc
+                .get(b"FontWeight")
+                .ok()
+                .and_then(|o| resolve(doc, o).ok())
+                .and_then(|o| o.as_i64().ok())
+            {
+                if weight > 500 {
+                    is_bold = true;
+                }
             }
             if !is_bold {
-                if let Some(flags) = desc.get(b"Flags").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_i64().ok()) {
-                    if (flags & 262144) != 0 { is_bold = true; } // Bit 18: ForceBold
+                if let Some(flags) = desc
+                    .get(b"Flags")
+                    .ok()
+                    .and_then(|o| resolve(doc, o).ok())
+                    .and_then(|o| o.as_i64().ok())
+                {
+                    if (flags & 262144) != 0 {
+                        is_bold = true;
+                    } // Bit 18: ForceBold
                 }
             }
         }
         if !is_bold {
-            if let Some(base_font) = dict.get(b"BaseFont").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_name().ok()) {
+            if let Some(base_font) = dict
+                .get(b"BaseFont")
+                .ok()
+                .and_then(|o| resolve(doc, o).ok())
+                .and_then(|o| o.as_name().ok())
+            {
                 let name = String::from_utf8_lossy(base_font).to_lowercase();
-                if name.contains("bold") || name.contains("black") || name.contains("heavy") || name.contains("medium") || name.contains("semibold") {
+                if name.contains("bold")
+                    || name.contains("black")
+                    || name.contains("heavy")
+                    || name.contains("medium")
+                    || name.contains("semibold")
+                {
                     is_bold = true;
                 }
             }
         }
         is_bold
     };
-    
+
     let mut is_bold = check_dict_for_bold(font_dict, false);
-    
+
     if is_cid && !is_bold {
-        if let Some(descendants) = font_dict.get(b"DescendantFonts").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_array().ok()) {
-            if let Some(first_descendant) = descendants.first().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_dict().ok()) {
+        if let Some(descendants) = font_dict
+            .get(b"DescendantFonts")
+            .ok()
+            .and_then(|o| resolve(doc, o).ok())
+            .and_then(|o| o.as_array().ok())
+        {
+            if let Some(first_descendant) = descendants
+                .first()
+                .and_then(|o| resolve(doc, o).ok())
+                .and_then(|o| o.as_dict().ok())
+            {
                 is_bold = check_dict_for_bold(first_descendant, is_bold);
             }
         }
@@ -353,7 +508,9 @@ fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
         if widths.len() > 10 {
             let mut w_map = std::collections::HashMap::new();
             for &w in widths {
-                if w > 0.0 { *w_map.entry((w * 100.0) as i32).or_insert(0) += 1; }
+                if w > 0.0 {
+                    *w_map.entry((w * 100.0) as i32).or_insert(0) += 1;
+                }
             }
             if let Some((_, max_count)) = w_map.iter().max_by_key(|&(_, c)| c) {
                 if (*max_count as f64) / (widths.len() as f64) >= 0.9 {
@@ -362,17 +519,37 @@ fn build_font_info(doc: &Document, font_obj: &Object) -> FontInfo {
             }
         }
     }
-    
+
     if !is_monospace {
-        if let Some(base_font) = font_dict.get(b"BaseFont").ok().and_then(|o| resolve(doc, o).ok()).and_then(|o| o.as_name().ok()) {
+        if let Some(base_font) = font_dict
+            .get(b"BaseFont")
+            .ok()
+            .and_then(|o| resolve(doc, o).ok())
+            .and_then(|o| o.as_name().ok())
+        {
             let name = String::from_utf8_lossy(base_font).to_lowercase();
-            if name.contains("courier") || name.contains("mono") || name.contains("consolas") || name.contains("menlo") || name.contains("monaco") {
+            if name.contains("courier")
+                || name.contains("mono")
+                || name.contains("consolas")
+                || name.contains("menlo")
+                || name.contains("monaco")
+            {
                 is_monospace = true;
             }
         }
     }
 
-    FontInfo { decoder, first_char, widths, is_cid, cid_default_width, cid_widths, _identity_encoding, is_bold, is_monospace }
+    FontInfo {
+        decoder,
+        first_char,
+        widths,
+        is_cid,
+        cid_default_width,
+        cid_widths,
+        _identity_encoding,
+        is_bold,
+        is_monospace,
+    }
 }
 
 /// Determine the best decoder for a single font dictionary.
@@ -404,7 +581,8 @@ fn build_font_decoder_from_dict(doc: &Document, font_dict: &lopdf::Dictionary) -
             || name.contains("Arial")
             || name.contains("Times")
             || name.contains("Courier")
-            || name.contains("Symbol") // not exactly WinAnsi, but ASCII-safe
+            || name.contains("Symbol")
+        // not exactly WinAnsi, but ASCII-safe
         {
             return FontDecoder::WinAnsi;
         }
@@ -434,7 +612,8 @@ fn parse_to_unicode_cmap(data: &[u8]) -> HashMap<Vec<u8>, String> {
                 }
                 let parts = extract_hex_groups(line);
                 if parts.len() >= 2 {
-                    if let (Some(src), Some(dst)) = (hex_to_bytes(&parts[0]), hex_to_string(&parts[1]))
+                    if let (Some(src), Some(dst)) =
+                        (hex_to_bytes(&parts[0]), hex_to_string(&parts[1]))
                     {
                         map.insert(src, dst);
                     }
@@ -581,35 +760,35 @@ fn decode_win_ansi(bytes: &[u8]) -> String {
 /// Windows-1252 single-byte → Unicode char.
 fn win_ansi_char(b: u8) -> char {
     match b {
-        0x80 => '\u{20AC}', // €
-        0x82 => '\u{201A}', // ‚
-        0x83 => '\u{0192}', // ƒ
-        0x84 => '\u{201E}', // „
-        0x85 => '\u{2026}', // …
-        0x86 => '\u{2020}', // †
-        0x87 => '\u{2021}', // ‡
-        0x88 => '\u{02C6}', // ˆ
-        0x89 => '\u{2030}', // ‰
-        0x8A => '\u{0160}', // Š
-        0x8B => '\u{2039}', // ‹
-        0x8C => '\u{0152}', // Œ
-        0x8E => '\u{017D}', // Ž
-        0x91 => '\u{2018}', // '
-        0x92 => '\u{2019}', // '
-        0x93 => '\u{201C}', // "
-        0x94 => '\u{201D}', // "
-        0x95 => '\u{2022}', // •
-        0x96 => '\u{2013}', // –
-        0x97 => '\u{2014}', // —
-        0x98 => '\u{02DC}', // ˜
-        0x99 => '\u{2122}', // ™
-        0x9A => '\u{0161}', // š
-        0x9B => '\u{203A}', // ›
-        0x9C => '\u{0153}', // œ
-        0x9E => '\u{017E}', // ž
-        0x9F => '\u{0178}', // Ÿ
+        0x80 => '\u{20AC}',                             // €
+        0x82 => '\u{201A}',                             // ‚
+        0x83 => '\u{0192}',                             // ƒ
+        0x84 => '\u{201E}',                             // „
+        0x85 => '\u{2026}',                             // …
+        0x86 => '\u{2020}',                             // †
+        0x87 => '\u{2021}',                             // ‡
+        0x88 => '\u{02C6}',                             // ˆ
+        0x89 => '\u{2030}',                             // ‰
+        0x8A => '\u{0160}',                             // Š
+        0x8B => '\u{2039}',                             // ‹
+        0x8C => '\u{0152}',                             // Œ
+        0x8E => '\u{017D}',                             // Ž
+        0x91 => '\u{2018}',                             // '
+        0x92 => '\u{2019}',                             // '
+        0x93 => '\u{201C}',                             // "
+        0x94 => '\u{201D}',                             // "
+        0x95 => '\u{2022}',                             // •
+        0x96 => '\u{2013}',                             // –
+        0x97 => '\u{2014}',                             // —
+        0x98 => '\u{02DC}',                             // ˜
+        0x99 => '\u{2122}',                             // ™
+        0x9A => '\u{0161}',                             // š
+        0x9B => '\u{203A}',                             // ›
+        0x9C => '\u{0153}',                             // œ
+        0x9E => '\u{017E}',                             // ž
+        0x9F => '\u{0178}',                             // Ÿ
         0x81 | 0x8D | 0x8F | 0x90 | 0x9D => '\u{FFFD}', // undefined
-        _ => b as char, // ASCII + Latin-1 Supplement
+        _ => b as char,                                 // ASCII + Latin-1 Supplement
     }
 }
 
@@ -685,18 +864,33 @@ impl Default for TextState {
     }
 }
 
-fn apply_text_spacing(new_tm: &[f64; 6], ts: &TextState, blocks: &mut Vec<RawBlock>, current: &mut Option<RawBlock>) {
+fn apply_text_spacing(
+    new_tm: &[f64; 6],
+    ts: &TextState,
+    blocks: &mut Vec<RawBlock>,
+    current: &mut Option<RawBlock>,
+) {
     if let Some(blk) = current.as_mut() {
         if !blk.text.is_empty() {
             let dx = new_tm[4] - ts.tm[4];
             let dy = new_tm[5] - ts.tm[5];
-            
-            let fs_y = ts.font_size.abs() * if ts.tm[3].abs() > 0.001 { ts.tm[3].abs() } else { 1.0 };
+
+            let fs_y = ts.font_size.abs()
+                * if ts.tm[3].abs() > 0.001 {
+                    ts.tm[3].abs()
+                } else {
+                    1.0
+                };
             let thresh_y = if fs_y > 0.1 { fs_y } else { 12.0 };
-            
-            let fs_x = ts.font_size.abs() * if ts.tm[0].abs() > 0.001 { ts.tm[0].abs() } else { 1.0 };
+
+            let fs_x = ts.font_size.abs()
+                * if ts.tm[0].abs() > 0.001 {
+                    ts.tm[0].abs()
+                } else {
+                    1.0
+                };
             let thresh_x = if fs_x > 0.1 { fs_x } else { 12.0 };
-            
+
             if dy.abs() > thresh_y * 0.3 || dx > thresh_x * 1.5 {
                 blocks.push(current.take().unwrap());
                 *current = Some(RawBlock::new());
@@ -764,46 +958,60 @@ fn process_operations(
                             if let Ok(resolved) = resolve(doc, obj_ref) {
                                 if let Ok(stream) = resolved.as_stream() {
                                     let dict = &stream.dict;
-                                    if dict.get(b"Subtype").and_then(|o| o.as_name()).unwrap_or(b"") == b"Form" {
+                                    if dict
+                                        .get(b"Subtype")
+                                        .and_then(|o| o.as_name())
+                                        .unwrap_or(b"")
+                                        == b"Form"
+                                    {
                                         // 1. Get Form's Matrix (default to Identity if missing)
-                                        let form_matrix = dict.get(b"Matrix").ok()
+                                        let form_matrix = dict
+                                            .get(b"Matrix")
+                                            .ok()
                                             .and_then(|o| resolve(doc, o).ok())
                                             .and_then(|o| o.as_array().ok())
                                             .map(|arr| mat_from_operands(arr))
                                             .unwrap_or(IDENTITY);
-                                        
+
                                         // 2. Compose Form Matrix with current CTM
                                         let effective_ctm = mat_mul(&form_matrix, &ctm);
-                                        
+
                                         // 3. Resolve Form's specific resources if present, else inherit
-                                        let form_resources = dict.get(b"Resources").ok()
+                                        let form_resources = dict
+                                            .get(b"Resources")
+                                            .ok()
                                             .and_then(|o| resolve(doc, o).ok())
                                             .and_then(|o| o.as_dict().ok());
-                                            
+
                                         let form_font_map = if let Some(res) = form_resources {
                                             build_font_map_from_resources(doc, Some(res))
                                         } else {
                                             font_map.clone()
                                         };
-                                        
+
                                         let form_xobjs_dict = if let Some(res) = form_resources {
-                                            res.get(b"XObject").ok()
+                                            res.get(b"XObject")
+                                                .ok()
                                                 .and_then(|o| resolve(doc, o).ok())
                                                 .and_then(|o| o.as_dict().ok())
                                         } else {
                                             xobjs_dict
                                         };
-                                        
+
                                         // 4. Decode Form stream and recurse
-                                        if let Some(form_content_bytes) = get_stream_content(doc, resolved) {
-                                            if let Ok(form_content) = lopdf::content::Content::decode(&form_content_bytes) {
+                                        if let Some(form_content_bytes) =
+                                            get_stream_content(doc, resolved)
+                                        {
+                                            if let Ok(form_content) =
+                                                lopdf::content::Content::decode(&form_content_bytes)
+                                            {
                                                 // If there's an active text block, push it before entering the form
                                                 if let Some(blk) = current.take() {
                                                     if !blk.text.is_empty() {
                                                         blocks.push(blk);
                                                     }
                                                 }
-                                                
+
                                                 process_operations(
                                                     doc,
                                                     &form_content.operations,
@@ -813,7 +1021,7 @@ fn process_operations(
                                                     depth + 1,
                                                     blocks,
                                                 );
-                                                
+
                                                 // No need to restore text state; 'Do' operates outside text objects.
                                             }
                                         }
@@ -960,11 +1168,11 @@ fn show_string(
     if blk.base_font_size == 0.0 {
         blk.base_font_size = ts.font_size;
     }
-    
+
     let start_idx = blk.text.chars().count();
     blk.text.push_str(&decoded);
     let end_idx = blk.text.chars().count();
-    
+
     if start_idx != end_idx {
         blk.spans.push(Span {
             start: start_idx,
@@ -1014,11 +1222,11 @@ fn show_tj_array(
             if blk.base_font_size == 0.0 {
                 blk.base_font_size = ts.font_size;
             }
-            
+
             let start_idx = blk.text.chars().count();
             blk.text.push_str(&decoded);
             let end_idx = blk.text.chars().count();
-            
+
             if start_idx != end_idx {
                 blk.spans.push(Span {
                     start: start_idx,
@@ -1048,9 +1256,14 @@ fn show_tj_array(
 
 /// Calculate the exact width of a string in text space using the PDF font's /Widths array if available.
 /// Fallback to 0.5 ems for missing widths.
-fn calculate_string_width(bytes: &[u8], font_info: Option<&FontInfo>, font_size: f64, h_scaling: f64) -> f64 {
+fn calculate_string_width(
+    bytes: &[u8],
+    font_info: Option<&FontInfo>,
+    font_size: f64,
+    h_scaling: f64,
+) -> f64 {
     let mut total_width_thousandths = 0.0;
-    
+
     if let Some(info) = font_info {
         if info.is_cid {
             let mut i = 0;
@@ -1058,14 +1271,18 @@ fn calculate_string_width(bytes: &[u8], font_info: Option<&FontInfo>, font_size:
                 let cid;
                 let advance;
                 if i + 1 < bytes.len() {
-                    cid = u16::from_be_bytes([bytes[i], bytes[i+1]]);
+                    cid = u16::from_be_bytes([bytes[i], bytes[i + 1]]);
                     advance = 2;
                 } else {
                     cid = bytes[i] as u16;
                     advance = 1;
                 }
-                
-                let glyph_width = info.cid_widths.get(&cid).copied().unwrap_or(info.cid_default_width);
+
+                let glyph_width = info
+                    .cid_widths
+                    .get(&cid)
+                    .copied()
+                    .unwrap_or(info.cid_default_width);
                 total_width_thousandths += glyph_width;
                 i += advance;
             }
@@ -1073,7 +1290,7 @@ fn calculate_string_width(bytes: &[u8], font_info: Option<&FontInfo>, font_size:
             for &byte in bytes {
                 let code = byte as u16;
                 let mut glyph_width = 500.0; // Standard fallback (0.5 ems)
-                
+
                 if let Some(widths) = &info.widths {
                     if code >= info.first_char && (code - info.first_char) < widths.len() as u16 {
                         glyph_width = widths[(code - info.first_char) as usize];
@@ -1087,7 +1304,7 @@ fn calculate_string_width(bytes: &[u8], font_info: Option<&FontInfo>, font_size:
             total_width_thousandths += 500.0;
         }
     }
-    
+
     (total_width_thousandths / 1000.0) * font_size.abs() * (h_scaling / 100.0)
 }
 
@@ -1139,10 +1356,7 @@ fn mat_translate(m: &[f64; 6], tx: f64, ty: f64) -> [f64; 6] {
 
 /// Transform a point (x, y) through an affine matrix.
 fn transform_pt(x: f64, y: f64, m: &[f64; 6]) -> (f64, f64) {
-    (
-        m[0] * x + m[2] * y + m[4],
-        m[1] * x + m[3] * y + m[5],
-    )
+    (m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5])
 }
 
 // ── Object helpers ──────────────────────────────────────────────
@@ -1192,7 +1406,7 @@ fn get_stream_content(doc: &Document, obj: &Object) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lopdf::{dictionary, StringFormat, Stream};
+    use lopdf::{dictionary, Stream, StringFormat};
 
     // ── helpers to build fixture PDFs programmatically ──
 
@@ -1224,7 +1438,10 @@ mod tests {
                 Operation::new("Td", vec![Object::Real(x as f32), Object::Real(y as f32)]),
                 Operation::new(
                     "Tj",
-                    vec![Object::String(text.as_bytes().to_vec(), StringFormat::Literal)],
+                    vec![Object::String(
+                        text.as_bytes().to_vec(),
+                        StringFormat::Literal,
+                    )],
                 ),
                 Operation::new("ET", vec![]),
             ];
@@ -1277,7 +1494,8 @@ mod tests {
         if pdf_bytes.is_empty() {
             return Err(ParseError::CorruptPdf("PDF data is empty".into()));
         }
-        let doc = Document::load_mem(pdf_bytes).map_err(|e| ParseError::CorruptPdf(e.to_string()))?;
+        let doc =
+            Document::load_mem(pdf_bytes).map_err(|e| ParseError::CorruptPdf(e.to_string()))?;
         let pages_tuples = extract_text(&doc)?;
         let mut pages = Vec::new();
         let mut all_warnings = Vec::new();
@@ -1292,7 +1510,7 @@ mod tests {
                 page_count: doc.get_pages().len() as u32,
                 parse_time_ms: 0,
                 warnings: all_warnings,
-            }
+            },
         })
     }
 
@@ -1343,7 +1561,10 @@ mod tests {
         assert_eq!(result.metadata.tier, "digital");
         assert_eq!(result.pages.len(), 1);
         assert_eq!(result.pages[0].page_num, 1);
-        assert!(!result.pages[0].blocks.is_empty(), "should have at least one block");
+        assert!(
+            !result.pages[0].blocks.is_empty(),
+            "should have at least one block"
+        );
 
         let block = &result.pages[0].blocks[0];
         assert!(
@@ -1482,13 +1703,16 @@ mod tests {
 
         let ops = vec![
             Operation::new("BT", vec![]),
-            Operation::new("Tf", vec![Object::Name(b"F1".to_vec()), Object::Integer(12)]),
+            Operation::new(
+                "Tf",
+                vec![Object::Name(b"F1".to_vec()), Object::Integer(12)],
+            ),
             Operation::new("Td", vec![Object::Real(72.0), Object::Real(700.0)]),
             Operation::new(
                 "TJ",
                 vec![Object::Array(vec![
                     Object::String(b"Hel".to_vec(), StringFormat::Literal),
-                    Object::Integer(-10),  // small kerning
+                    Object::Integer(-10), // small kerning
                     Object::String(b"lo".to_vec(), StringFormat::Literal),
                     Object::Integer(-200), // large gap → space
                     Object::String(b"World".to_vec(), StringFormat::Literal),
@@ -1528,7 +1752,13 @@ mod tests {
 
         let result = extract_text_for_test(&buf).unwrap();
         let text = &result.pages[0].blocks[0].text();
-        assert!(text.contains("Hello"), "should contain 'Hello', got '{text}'");
-        assert!(text.contains("World"), "should contain 'World', got '{text}'");
+        assert!(
+            text.contains("Hello"),
+            "should contain 'Hello', got '{text}'"
+        );
+        assert!(
+            text.contains("World"),
+            "should contain 'World', got '{text}'"
+        );
     }
 }

@@ -1,5 +1,6 @@
 fn main() {
-    let doc = lopdf::Document::load("../lightningparse-core/tests/fixtures/code_block_fixture.pdf").unwrap();
+    let doc = lopdf::Document::load("../lightningparse-core/tests/fixtures/code_block_fixture.pdf")
+        .unwrap();
     let page_id = doc.get_pages()[&1];
     let content_data = doc.get_page_content(page_id).unwrap();
     println!("Decompressed length: {}", content_data.len());
