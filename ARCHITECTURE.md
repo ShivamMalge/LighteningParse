@@ -123,10 +123,13 @@ Output schema (per document):
   "metadata": {
     "tier": "digital|scanned|mixed",
     "page_count": 12,
-    "parse_time_ms": 340
+    "parse_time_ms": 340,
+    "warnings": ["Warning message (optional)"]
   }
 }
 ```
+
+**Note on Metadata Warnings**: The `warnings` array is omitted from the JSON output when empty. Clients should use `.get('warnings', [])` instead of assuming the key is always present.
 
 **Note on Tables**: v1 Table extraction identifies simple bordered or geometrically aligned tables with single-line cell content. Nested tables, spanned/merged cells, and multi-line cells inside tables are explicitly out of scope for v1.
 
