@@ -1,0 +1,74 @@
+{
+  "pages": [
+    {
+      "page_num": 1,
+      "blocks": [
+        {
+          "type": "text",
+          "text": "This is a test document with embedded CID fonts.",
+          "bbox": [
+            148.71199798583984,
+            707.1250152587891,
+            370.44958071804047,
+            717.0876150131226
+          ],
+          "section_id": "header",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "\u4e2d\u6587\u6d4b\u8bd5\u6587\u6863\u2014\u4f60\u597d\uff0c\u4e16\u754c\uff01\u8fd9\u662f\u4e00\u4e2a\u6d4b\u8bd5\u3002",
+          "bbox": [
+            148.71199798583984,
+            695.170015335083,
+            346.9079574985504,
+            705.1326150894165
+          ],
+          "section_id": "header",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "\u65e5\u672c\u8a9e\u306e\u30c6\u30b9\u30c8\u3067\u3059\u3002\u3053\u3093\u306b\u3061\u306f\u3001\u4e16\u754c\uff01",
+          "bbox": [
+            148.71199798583984,
+            683.215015411377,
+            338.00139331817627,
+            693.1776151657104
+          ],
+          "section_id": "header",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "English text mixed with \u4e2d\u6587 and \u65e5\u672c\u8a9e in the same paragraph.",
+          "bbox": [
+            148.71199798583984,
+            671.2600154876709,
+            434.07139662647245,
+            681.2226152420044
+          ],
+          "section_id": "header",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "1",
+          "bbox": [
+            303.132999420166,
+            139.2550106048584,
+            308.11429929733276,
+            149.2176103591919
+          ],
+          "section_id": "body",
+          "source": "digital"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "tier": "digital",
+    "page_count": 1,
+    "parse_time_ms": 0
+  }
+}

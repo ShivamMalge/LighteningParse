@@ -1,0 +1,793 @@
+{
+  "pages": [
+    {
+      "page_num": 1,
+      "blocks": [
+        {
+          "type": "text",
+          "text": "LightningParse: Hybrid Rust-Python PDF Extraction",
+          "bbox": [
+            108.19999694824219,
+            741.8499755859375,
+            402.1999969482422,
+            753.8499755859375
+          ],
+          "section_id": "header",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "Anonymous Authors, Example University",
+          "bbox": [
+            215.4199981689453,
+            703.9600219726562,
+            437.4199981689453,
+            715.9600219726562
+          ],
+          "section_id": "header",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "Abstract",
+          "bbox": [
+            285.7200012207031,
+            664.280029296875,
+            333.7200012207031,
+            676.280029296875
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "We present LightningParse, combining Rust parallel extraction with Python NLP integration. Achieves 47x median speedup on",
+          "bbox": [
+            31.18000030517578,
+            646.1500244140625,
+            757.1800003051758,
+            658.1500244140625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "digital-native PDFs.",
+          "bbox": [
+            31.18000030517578,
+            631.97998046875,
+            151.18000030517578,
+            643.97998046875
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "I. Introduction",
+          "bbox": [
+            31.18000030517578,
+            607.5800170898438,
+            121.18000030517578,
+            619.5800170898438
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "II. Architecture",
+          "bbox": [
+            308.9800109863281,
+            607.5800170898438,
+            404.9800109863281,
+            619.5800170898438
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "Recent advances in document parsing have demonstrated",
+          "bbox": [
+            31.18000030517578,
+            592.2899780273438,
+            349.1800003051758,
+            604.2899780273438
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "The proposed pipeline operates in two tiers. Tier 1 handles",
+          "bbox": [
+            308.9800109863281,
+            592.2899780273438,
+            662.9800109863281,
+            604.2899780273438
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "that parallel extraction architectures can significantly",
+          "bbox": [
+            31.18000030517578,
+            578.1199951171875,
+            367.1800003051758,
+            590.1199951171875
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "digitally-authored PDFs by directly parsing the content",
+          "bbox": [
+            308.9800109863281,
+            578.1199951171875,
+            638.9800109863281,
+            590.1199951171875
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "outperform traditional sequential approaches.",
+          "bbox": [
+            31.18000030517578,
+            563.9500122070312,
+            301.1800003051758,
+            575.9500122070312
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "stream operators.",
+          "bbox": [
+            308.9800109863281,
+            563.9500122070312,
+            410.9800109863281,
+            575.9500122070312
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "1",
+          "bbox": [
+            303.5,
+            39.81999969482422,
+            309.5,
+            51.81999969482422
+          ],
+          "section_id": "body",
+          "source": "digital"
+        }
+      ]
+    },
+    {
+      "page_num": 2,
+      "blocks": [
+        {
+          "type": "text",
+          "text": "III. Extraction",
+          "bbox": [
+            31.18000030517578,
+            752.1500244140625,
+            121.18000030517578,
+            764.1500244140625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "IV. OCR Fallback",
+          "bbox": [
+            308.9800109863281,
+            752.1500244140625,
+            404.9800109863281,
+            764.1500244140625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "Experimental evaluation on a corpus of 50 documents shows",
+          "bbox": [
+            31.18000030517578,
+            736.8599853515625,
+            373.1800003051758,
+            748.8599853515625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "Font metric resolution is critical for accurate bounding box",
+          "bbox": [
+            308.9800109863281,
+            736.8599853515625,
+            668.9800109863281,
+            748.8599853515625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "a median speedup of 47x over baseline Python libraries.",
+          "bbox": [
+            31.18000030517578,
+            722.6900024414062,
+            361.1800003051758,
+            734.6900024414062
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "computation.",
+          "bbox": [
+            308.9800109863281,
+            722.6900024414062,
+            380.9800109863281,
+            734.6900024414062
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "2",
+          "bbox": [
+            303.5,
+            39.81999969482422,
+            309.5,
+            51.81999969482422
+          ],
+          "section_id": "body",
+          "source": "digital"
+        }
+      ]
+    },
+    {
+      "page_num": 3,
+      "blocks": [
+        {
+          "type": "text",
+          "text": "V. Font Metrics",
+          "bbox": [
+            31.18000030517578,
+            752.1500244140625,
+            121.18000030517578,
+            764.1500244140625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "VI. Headers",
+          "bbox": [
+            308.9800109863281,
+            752.1500244140625,
+            374.9800109863281,
+            764.1500244140625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "Header and footer detection uses a heuristic approach based",
+          "bbox": [
+            31.18000030517578,
+            736.8599853515625,
+            385.1800003051758,
+            748.8599853515625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "Reading order reconstruction sorts blocks by vertical position",
+          "bbox": [
+            308.9800109863281,
+            736.8599853515625,
+            680.9800109863281,
+            748.8599853515625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "on repeated text in page margins.",
+          "bbox": [
+            31.18000030517578,
+            722.6900024414062,
+            229.18000030517578,
+            734.6900024414062
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "then applies column-detection.",
+          "bbox": [
+            308.9800109863281,
+            722.6900024414062,
+            488.9800109863281,
+            734.6900024414062
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "3",
+          "bbox": [
+            303.5,
+            39.81999969482422,
+            309.5,
+            51.81999969482422
+          ],
+          "section_id": "body",
+          "source": "digital"
+        }
+      ]
+    },
+    {
+      "page_num": 4,
+      "blocks": [
+        {
+          "type": "text",
+          "text": "VII. Reading Order",
+          "bbox": [
+            31.18000030517578,
+            752.1500244140625,
+            139.18000030517578,
+            764.1500244140625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "VIII. Results",
+          "bbox": [
+            308.9800109863281,
+            752.1500244140625,
+            386.9800109863281,
+            764.1500244140625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "The FFI boundary between Rust and Python uses JSON",
+          "bbox": [
+            31.18000030517578,
+            736.8599853515625,
+            331.1800003051758,
+            748.8599853515625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "Future work includes structured table extraction for",
+          "bbox": [
+            308.9800109863281,
+            736.8599853515625,
+            620.9800109863281,
+            748.8599853515625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "serialization with less than 2 percent overhead.",
+          "bbox": [
+            31.18000030517578,
+            722.6900024414062,
+            319.1800003051758,
+            734.6900024414062
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "grid-aligned text blocks.",
+          "bbox": [
+            308.9800109863281,
+            722.6900024414062,
+            458.9800109863281,
+            734.6900024414062
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "4",
+          "bbox": [
+            303.5,
+            39.81999969482422,
+            309.5,
+            51.81999969482422
+          ],
+          "section_id": "body",
+          "source": "digital"
+        }
+      ]
+    },
+    {
+      "page_num": 5,
+      "blocks": [
+        {
+          "type": "text",
+          "text": "IX. Discussion",
+          "bbox": [
+            31.18000030517578,
+            752.1500244140625,
+            115.18000030517578,
+            764.1500244140625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "X. Related Work",
+          "bbox": [
+            308.9800109863281,
+            752.1500244140625,
+            398.9800109863281,
+            764.1500244140625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "Recent advances in document parsing have demonstrated",
+          "bbox": [
+            31.18000030517578,
+            736.8599853515625,
+            349.1800003051758,
+            748.8599853515625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "The proposed pipeline operates in two tiers. Tier 1 handles",
+          "bbox": [
+            308.9800109863281,
+            736.8599853515625,
+            662.9800109863281,
+            748.8599853515625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "that parallel extraction architectures can significantly",
+          "bbox": [
+            31.18000030517578,
+            722.6900024414062,
+            367.1800003051758,
+            734.6900024414062
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "digitally-authored PDFs by directly parsing the content",
+          "bbox": [
+            308.9800109863281,
+            722.6900024414062,
+            638.9800109863281,
+            734.6900024414062
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "outperform traditional sequential approaches.",
+          "bbox": [
+            31.18000030517578,
+            708.510009765625,
+            301.1800003051758,
+            720.510009765625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "stream operators.",
+          "bbox": [
+            308.9800109863281,
+            708.510009765625,
+            410.9800109863281,
+            720.510009765625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "5",
+          "bbox": [
+            303.5,
+            39.81999969482422,
+            309.5,
+            51.81999969482422
+          ],
+          "section_id": "body",
+          "source": "digital"
+        }
+      ]
+    },
+    {
+      "page_num": 6,
+      "blocks": [
+        {
+          "type": "text",
+          "text": "XI. Conclusion",
+          "bbox": [
+            31.18000030517578,
+            752.1500244140625,
+            115.18000030517578,
+            764.1500244140625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "XII. Future Work",
+          "bbox": [
+            308.9800109863281,
+            752.1500244140625,
+            404.9800109863281,
+            764.1500244140625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "Experimental evaluation on a corpus of 50 documents shows",
+          "bbox": [
+            31.18000030517578,
+            736.8599853515625,
+            373.1800003051758,
+            748.8599853515625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "Font metric resolution is critical for accurate bounding box",
+          "bbox": [
+            308.9800109863281,
+            736.8599853515625,
+            668.9800109863281,
+            748.8599853515625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "a median speedup of 47x over baseline Python libraries.",
+          "bbox": [
+            31.18000030517578,
+            722.6900024414062,
+            361.1800003051758,
+            734.6900024414062
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "computation.",
+          "bbox": [
+            308.9800109863281,
+            722.6900024414062,
+            380.9800109863281,
+            734.6900024414062
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "6",
+          "bbox": [
+            303.5,
+            39.81999969482422,
+            309.5,
+            51.81999969482422
+          ],
+          "section_id": "body",
+          "source": "digital"
+        }
+      ]
+    },
+    {
+      "page_num": 7,
+      "blocks": [
+        {
+          "type": "text",
+          "text": "7",
+          "bbox": [
+            303.5,
+            39.81999969482422,
+            309.5,
+            51.81999969482422
+          ],
+          "section_id": "body",
+          "source": "digital"
+        }
+      ]
+    },
+    {
+      "page_num": 8,
+      "blocks": [
+        {
+          "type": "text",
+          "text": "References",
+          "bbox": [
+            273.6499938964844,
+            745.8800048828125,
+            333.6499938964844,
+            757.8800048828125
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "[1] Smith, Fast PDF parsing, SIGMOD 2023.",
+          "bbox": [
+            31.18000030517578,
+            714.1799926757812,
+            277.1800003051758,
+            726.1799926757812
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "[2] Jones, OCR survey, ACM 2022.",
+          "bbox": [
+            31.18000030517578,
+            694.3400268554688,
+            223.18000030517578,
+            706.3400268554688
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "[3] Lee, CID fonts, Tech Report 2021.",
+          "bbox": [
+            31.18000030517578,
+            674.5,
+            253.18000030517578,
+            686.5
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "[4] Brown, Parallel pipelines, IEEE 2022.",
+          "bbox": [
+            31.18000030517578,
+            654.6500244140625,
+            277.1800003051758,
+            666.6500244140625
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "[5] Garcia, Header detection, ICDAR 2023.",
+          "bbox": [
+            31.18000030517578,
+            634.8099975585938,
+            277.1800003051758,
+            646.8099975585938
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "[6] Wang, Reading order, DAS 2022.",
+          "bbox": [
+            31.18000030517578,
+            614.969970703125,
+            235.18000030517578,
+            626.969970703125
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "[7] Chen, RAG pipelines, NAACL 2023.",
+          "bbox": [
+            31.18000030517578,
+            595.1300048828125,
+            247.18000030517578,
+            607.1300048828125
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "[8] Patel, PDF benchmarks, arXiv 2023.",
+          "bbox": [
+            31.18000030517578,
+            575.280029296875,
+            259.1800003051758,
+            587.280029296875
+          ],
+          "section_id": "body",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "8",
+          "bbox": [
+            303.5,
+            39.81999969482422,
+            309.5,
+            51.81999969482422
+          ],
+          "section_id": "body",
+          "source": "digital"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "tier": "digital",
+    "page_count": 8,
+    "parse_time_ms": 0
+  }
+}

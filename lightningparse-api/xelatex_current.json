@@ -1,0 +1,252 @@
+{
+  "pages": [
+    {
+      "page_num": 1,
+      "blocks": [
+        {
+          "type": "text",
+          "text": "This is a test document with embedded CID fonts.",
+          "spans": [
+            {
+              "start": 0,
+              "end": 4,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 5,
+              "end": 7,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 8,
+              "end": 9,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 10,
+              "end": 14,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 15,
+              "end": 17,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 17,
+              "end": 22,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 22,
+              "end": 23,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 24,
+              "end": 28,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 29,
+              "end": 31,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 31,
+              "end": 32,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 32,
+              "end": 37,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 38,
+              "end": 41,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 42,
+              "end": 45,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 45,
+              "end": 48,
+              "bold": false,
+              "font_size": 9.962599754333496
+            }
+          ],
+          "bbox": [
+            148.71199798583984,
+            707.1250152587891,
+            370.44958071804047,
+            717.0876150131226
+          ],
+          "section_id": "header",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "\u4e2d\u6587\u6d4b\u8bd5\u6587\u6863\u2014\u4f60\u597d\uff0c\u4e16\u754c\uff01\u8fd9\u662f\u4e00\u4e2a\u6d4b\u8bd5\u3002",
+          "spans": [
+            {
+              "start": 0,
+              "end": 20,
+              "bold": false,
+              "font_size": 9.962599754333496
+            }
+          ],
+          "bbox": [
+            148.71199798583984,
+            695.170015335083,
+            346.9079574985504,
+            705.1326150894165
+          ],
+          "section_id": "header",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "\u65e5\u672c\u8a9e\u306e\u30c6\u30b9\u30c8\u3067\u3059\u3002\u3053\u3093\u306b\u3061\u306f\u3001\u4e16\u754c\uff01",
+          "spans": [
+            {
+              "start": 0,
+              "end": 19,
+              "bold": false,
+              "font_size": 9.962599754333496
+            }
+          ],
+          "bbox": [
+            148.71199798583984,
+            683.215015411377,
+            338.00139331817627,
+            693.1776151657104
+          ],
+          "section_id": "header",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "English text mixed with \u4e2d\u6587 and \u65e5\u672c\u8a9e in the same paragraph.",
+          "spans": [
+            {
+              "start": 0,
+              "end": 7,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 8,
+              "end": 12,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 13,
+              "end": 18,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 19,
+              "end": 23,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 24,
+              "end": 26,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 27,
+              "end": 30,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 31,
+              "end": 34,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 35,
+              "end": 37,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 38,
+              "end": 41,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 42,
+              "end": 46,
+              "bold": false,
+              "font_size": 9.962599754333496
+            },
+            {
+              "start": 47,
+              "end": 57,
+              "bold": false,
+              "font_size": 9.962599754333496
+            }
+          ],
+          "bbox": [
+            148.71199798583984,
+            671.2600154876709,
+            434.07139662647245,
+            681.2226152420044
+          ],
+          "section_id": "header",
+          "source": "digital"
+        },
+        {
+          "type": "text",
+          "text": "1",
+          "spans": [
+            {
+              "start": 0,
+              "end": 1,
+              "bold": false,
+              "font_size": 9.962599754333496
+            }
+          ],
+          "bbox": [
+            303.132999420166,
+            139.2550106048584,
+            308.11429929733276,
+            149.2176103591919
+          ],
+          "section_id": "body",
+          "source": "digital"
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "tier": "digital",
+    "page_count": 1,
+    "parse_time_ms": 0
+  }
+}
