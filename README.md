@@ -2,7 +2,15 @@
 
 Fast, accurate PDF parsing for RAG pipelines — a Rust extraction core (via PyO3) feeding a Python chunking/embedding/retrieval pipeline.
 
-> **Status:** core pipeline complete — Rust extraction, cleanup, OCR fallback, chunking, retrieval, and generation are all implemented and benchmarked end-to-end. See [`PHASES.md`](./PHASES.md) for what's built and [`BENCHMARKS.md`](./benchmarks/BENCHMARKS.md) for full results.
+> **Status:** published on PyPI (`pip install lightningparse`). Core pipeline complete — Rust extraction, cleanup, OCR fallback, semantic block typing, chunking, retrieval, and generation are all implemented and benchmarked end-to-end. See [`PHASES.md`](./PHASES.md) for the original build roadmap and [`BENCHMARKS.md`](./benchmarks/BENCHMARKS.md) for full results.
+
+## What's New in v0.3.0
+
+- **Semantic block typing**: text blocks are now classified with a `block_role` — `"heading"` (detected via document-relative font-size/weight heuristics) or `"code"` (detected via structural monospace-font analysis)
+- **Style span tracking**: a new `spans` array on text blocks preserves per-character style regions (bold, font size, monospace), so mixed-style lines (e.g. inline code, bold labels) aren't lost during extraction
+- **Fixed a same-line fragmentation bug**: lines with a mid-line style change (e.g. `Frontend:` in bold followed by regular text) were previously split into multiple blocks, sometimes mid-word
+- **Fixed a PDF-spec-compliance bug**: `BT`/`ET` operators were incorrectly resetting font state, which also improved reading order on existing multi-column fixtures
+- **Added visibility for unsupported content stream filters**: PDFs using filters LightningParse can't yet decode (e.g. `ASCII85Decode`) now surface a `warnings` array in the response metadata instead of silently misrouting to OCR
 
 ## What's New in v0.2.0
 
@@ -14,12 +22,12 @@ Fast, accurate PDF parsing for RAG pipelines — a Rust extraction core (via PyO
 
 ## Why
 
-Traditional Python PDF libraries (PyPDF2, pdfplumber, PyMuPDF) are GIL-bound and process pages sequentially, which becomes a bottleneck in RAG ingestion pipelines. LightningParse pushes extraction, header/footer cleanup, and OCR fallback into Rust, parallelized across pages, and returns structured JSON that Python can chunk with page/section metadata intact.
+Traditional Python PDF libraries (PyPDF2, pdfplumber, PyMuPDF) are GIL-bound and process pages sequentially, which becomes a bottleneck in RAG ingestion pipelines. LightningParse pushes extraction, cleanup, semantic typing, and OCR fallback into Rust, parallelized across pages, and returns structured JSON that Python can chunk with page/section metadata intact.
 
 ## Architecture
 
 ```
-React → FastAPI → Rust PDF Parser (PyO3) → Chunker → FAISS/Chroma → LLM
+React → FastAPI → Rust PDF Parser (PyO3) → Chunker → Chroma → LLM
 ```
 
 Two processing tiers:
@@ -55,21 +63,29 @@ Results are published in `benchmarks/BENCHMARKS.md` — generated, not hand-writ
 
 ## Known Limitations
 
-- **CID/Type0 composite fonts:** glyph width lookup currently only reads `/Widths` (simple fonts); CID fonts fall back to a standard 0.5 em width, verified safe (no crash) but not pixel-precise for bbox positioning. See `ARCHITECTURE.md` decision log.
-- **Unsupported content stream filters (ASCII85Decode, etc.):** lopdf 0.33 only decodes `FlateDecode` and `LZWDecode` content stream filters. PDFs using other filters (most commonly `ASCII85Decode`, found in older PDF generators and reportlab output) will silently produce zero text blocks from Tier 1 extraction. These pages get misrouted to Tier 2 OCR, producing degraded output — OCR on a digital-native PDF loses font metadata, introduces character errors, and is much slower than the digital extraction that should have happened. This is a correctness issue affecting a minority of real-world PDFs, not just synthetic fixtures. A fix (adding a ~40-line ASCII85 decoder) is straightforward and tracked for a future phase.
+- **CID/Type0 composite fonts:** glyph width lookup currently only reads `/Widths` (simple fonts); CID fonts fall back to a standard 0.5 em width, verified safe (no crash) but not pixel-precise for bbox positioning. The same fallback is used for the `code` block-role detector, so monospace CID fonts are only detected via font-name matching, not structural width analysis. See `ARCHITECTURE.md` decision log.
+- **Unsupported content stream filters (ASCII85Decode, etc.):** lopdf 0.33 only decodes `FlateDecode` and `LZWDecode` content stream filters. PDFs using other filters (most commonly `ASCII85Decode`, found in older PDF generators and some `reportlab` output) will still produce zero text blocks from Tier 1 extraction and get misrouted to Tier 2 OCR. As of v0.3.0, this is no longer silent — affected pages surface a `warnings` array in the response metadata (`result["metadata"]["warnings"]`) so callers can detect and handle it programmatically. A full fix (adding an ASCII85 decoder) is still tracked for a future release.
+- **Heading detection false positives:** heading classification is based purely on font-size ratio, weight, and line length relative to the document's own body text — it has no semantic understanding of document structure. Stylistically-emphasized text that isn't a real section heading (e.g., a bolded date range, a pull-quote) can be misclassified as `block_role: "heading"`. See `ARCHITECTURE.md` decision log for the specific tradeoff.
 - **OCR noise:** Tesseract confidence-based filtering removes most scan artifacts (binder shadows, margin smudges) but some low-level noise can still pass through on real-world scans. OCR output is not expected to be flawless — see `PRD.md` non-goals.
-- **Tier 2/Mixed fixture coverage:** currently validated against a small number of real scanned/mixed fixtures rather than a broad corpus. On the synthetic `phone_photo_invoice.pdf` fixture specifically, heavy combined distortion (rotation + noise + lighting gradient + blur) caused the OCR confidence filter to discard all real content along with the noise — 0 of 7 real lines recovered. This demonstrates the system fails safely (no crash, no hallucinated garbage) under severe distortion, but does not currently recover text from heavily degraded scans. Real-world phone photos are often less distorted than this synthetic worst-case, but this is a genuine, unresolved limitation, not just a synthetic-vs-real fidelity gap. Speedup claims for Tier 1 are well-validated across multiple document types; Tier 2 performance numbers should be read as representative of the current fixtures, not a broad guarantee.
-- **Tables and complex layouts:** table extraction is flattened to text, not structured (rows/columns), in v1. Full table structure extraction is out of scope for now — see `PRD.md`.
+- **Tier 2/Mixed fixture coverage:** currently validated against a small number of real scanned/mixed fixtures rather than a broad corpus. On the synthetic `phone_photo_invoice.pdf` fixture specifically, heavy combined distortion (rotation + noise + lighting gradient + blur) caused the OCR confidence filter to discard all real content along with the noise — 0 of 7 real lines recovered. This demonstrates the system fails safely (no crash, no hallucinated garbage) under severe distortion, but does not currently recover text from heavily degraded scans. Speedup claims for Tier 1 are well-validated across multiple document types; Tier 2 performance numbers should be read as representative of the current fixtures, not a broad guarantee.
+- **Complex/borderless tables:** table detection requires a nearby caption (e.g. "Table 1") and consistent row/column geometry. Tables without captions, or with irregular formatting (superscripts breaking row alignment, merged cells), fall back to flat text rather than structured rows — no data is lost, but structure isn't always recovered. See `PRD.md`.
 - **Encrypted/form PDFs:** not explicitly supported in v1.
 
 ## Install
 
 ```bash
+pip install lightningparse
+```
+
+Prebuilt wheels are published for Linux, macOS, and Windows via CI. If no matching wheel is available for your platform/Python version, pip will build from source automatically (requires a Rust toolchain).
+
+For local development on this repo:
+```bash
 # Rust core (requires maturin)
 cd lightningparse-core
 maturin develop --release
 
-# Python API
+# Python API layer (reference RAG pipeline, not required to use the core parser)
 cd lightningparse-api
 pip install -e .
 ```
@@ -78,18 +94,25 @@ pip install -e .
 
 ```python
 from lightningparse import parse_pdf
+import json
 
-result = parse_pdf("document.pdf")
+result = json.loads(parse_pdf("document.pdf"))
+
 for page in result["pages"]:
     for block in page["blocks"]:
-        print(block["section_id"], block["text"][:80])
+        role = block.get("block_role")  # "heading", "code", or None
+        print(block["section_id"], role, block["text"][:80])
+
+# Check for extraction warnings (e.g. unsupported content stream filters)
+if result["metadata"].get("warnings"):
+    print("Warnings:", result["metadata"]["warnings"])
 ```
 
 ## Scope (v1)
 
-**In scope:** digital-native PDF extraction, header/footer/footnote removal, OCR fallback for scanned pages, metadata-aware chunking, retrieval + LLM Q&A pipeline with citations.
+**In scope:** digital-native PDF extraction, header/footer/footnote removal, OCR fallback for scanned pages, structured table extraction, heading/code semantic block typing, metadata-aware chunking, retrieval + LLM Q&A pipeline with citations.
 
-**Not in scope yet:** structured table extraction, encrypted/form PDFs, ML-based layout detection. See `PRD.md` §2 for the full non-goals list — these are deliberate cuts, not oversights.
+**Not in scope yet:** full CID/Type0 structural width analysis, encrypted/form PDFs, ML-based layout detection, list/markdown-aware block typing. See `PRD.md` §2 for the full non-goals list — these are deliberate cuts, not oversights.
 
 ## Contributing
 
